@@ -3,7 +3,7 @@ import { Check, Zap, Globe } from 'lucide-react';
 import { Button } from './ui/Button';
 
 interface PricingProps {
-  onPlanSelect: (planName: string) => void;
+  onPlanSelect: (planName: string, price: string) => void;
 }
 
 export const Pricing: React.FC<PricingProps> = ({ onPlanSelect }) => {
@@ -163,7 +163,7 @@ export const Pricing: React.FC<PricingProps> = ({ onPlanSelect }) => {
               <Button 
                 variant={plan.popular ? 'primary' : 'outline'} 
                 className="w-full"
-                onClick={() => onPlanSelect(plan.name)}
+                onClick={() => onPlanSelect(plan.name, isAnnual ? plan.annualPrice : plan.price)}
               >
                 {plan.cta}
               </Button>

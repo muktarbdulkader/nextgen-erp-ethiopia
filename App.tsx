@@ -10,6 +10,7 @@ import { DashboardLayout } from './components/dashboard/DashboardLayout';
 import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { PartnerModal } from './components/PartnerModal';
+import { PaymentMethodModal } from './components/PaymentMethodModal';
 import { User, LanguageCode } from './types';
 
 type ViewState = 'landing' | 'login' | 'register' | 'dashboard';
@@ -19,7 +20,10 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewState>('landing');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
+  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | undefined>(undefined);
+  const [selectedPlanPrice, setSelectedPlanPrice] = useState<string>('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'telebirr' | 'cbe' | 'card' | null>(null);
   const [language, setLanguage] = useState<LanguageCode>('EN');
 
   // Initialize theme based on preference
@@ -142,9 +146,20 @@ function App() {
             
             <Features />
 
-            <Pricing onPlanSelect={(plan) => {
+            <Pricing onPlanSelect={(plan, price) => {
               setSelectedPlan(plan);
-              setCurrentView('register');
+              setSelectedPlanPrice(price);
+              
+              // For free plan, go directly to register
+              if (plan === 'Starter') {
+                setCurrentView('register');
+              } else if (plan === 'Enterprise') {
+                // For enterprise, open contact modal
+                setIsPartnerModalOpen(true);
+              } else {
+                // For paid plans, show payment method selection
+                setIsPaymentMethodModalOpen(true);
+              }
             }} />
 
             {/* AI Showcase Section */}
@@ -213,7 +228,24 @@ function App() {
           </main>
 
           <Footer onPartnerClick={() => setIsPartnerModalOpen(true)} />
-          <PartnerModal isOpen={isPartnerModalOpen} onClose={() => setIsPartnerModalOpen(false)} />
+          
+          {/* Modals */}
+          <PartnerModal 
+            isOpen={isPartnerModalOpen} 
+            onClose={() => setIsPartnerModalOpen(false)} 
+          />
+          
+          <PaymentMethodModal
+            isOpen={isPaymentMethodModalOpen}
+            onClose={() => setIsPaymentMethodModalOpen(false)}
+            planName={selectedPlan || 'Growth'}
+            planPrice={selectedPlanPrice}
+            onMethodSelected={(method) => {
+              setSelectedPaymentMethod(method);
+              setIsPaymentMethodModalOpen(false);
+              setCurrentView('register');
+            }}
+          />
         </div>
       );
   }
