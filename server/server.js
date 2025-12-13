@@ -1,0 +1,104 @@
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const { PrismaClient } = require('@prisma/client');
+const apiRoutes = require('./src/routes/api');
+const logger = require('./src/middleware/logger');
+const { errorHandler, notFound } = require('./src/middleware/errorHandler');
+
+// Load .env (correct location)
+dotenv.config();
+
+// Initialize Prisma
+const prisma = new PrismaClient();
+
+// Initialize Express
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Trust proxy (for deployment behind reverse proxy)
+app.set('trust proxy', 1);
+
+// Allowed origins
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://10.232.83.59:3000',
+  'http://172.29.176.1:3000',   // ← Added for your network
+  'http://172.21.48.1:3000',    // ← Added for your network
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+// CORS middleware
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.log("❌ Blocked by CORS:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+// Request logging
+if (process.env.NODE_ENV !== 'test') {
+  app.use(logger);
+}
+
+// Prisma available in req
+app.use((req, res, next) => {
+  req.prisma = prisma;
+  next();
+});
+
+// Test database
+(async () => {
+  try {
+    await prisma.$connect();
+    console.log("✅ Database connected successfully");
+  } catch (error) {
+    console.error("❌ Database connection error:", error.message);
+  }
+})();
+
+// API Routes
+app.use('/api', apiRoutes);
+
+// Health check
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    database: prisma ? "connected" : "disconnected"
+  });
+});
+
+// 404 handler
+app.use(notFound);
+
+// Global error handler
+app.use(errorHandler);
+
+// Start server
+const server = app.listen(PORT, () => {
+  console.log(`
+🚀 Server running on port ${PORT}
+---------------------------------------
+API: http://localhost:${PORT}/api
+Health: http://localhost:${PORT}/health
+---------------------------------------
+  `);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("Shutting down...");
+  server.close(() => process.exit(0));
+});

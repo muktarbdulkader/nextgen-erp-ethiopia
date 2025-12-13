@@ -1,0 +1,292 @@
+// =============================================
+// GENERATOR & DATASOURCE
+// =============================================
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// FINANCE — ACCOUNT
+// =============================================
+model Account {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  type          String
+  balance       Float         @default(0)
+  accountNumber String?
+  bankName      String?
+  branch        String?
+  status        String        @default("active")
+  companyName   String        // Multi-tenancy
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  transactions  Transaction[]
+  
+  @@index([companyName])
+}
+
+// =============================================
+// FINANCE — TRANSACTION
+// =============================================
+model Transaction {
+  id            String     @id @default(auto()) @map("_id") @db.ObjectId
+  type          String
+  amount        Float
+  description   String
+  date          DateTime   @default(now())
+  category      String
+  reference     String?
+
+  accountId     String     @db.ObjectId
+  account       Account    @relation(fields: [accountId], references: [id])
+
+  createdBy     String     @db.ObjectId
+  user          User       @relation(fields: [createdBy], references: [id])
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+// =============================================
+// USER MODEL (AUTH)
+// =============================================
+model User {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  firstName     String
+  lastName      String
+  email         String          @unique
+  password      String
+  companyName   String
+  plan          String          @default("Starter")
+  role          String          @default("user")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  notifications Notification[]
+  tasks         Task[]
+  orders        Order[]
+  payments      Payment[]
+  chatHistories ChatHistory[]
+  aiInteractions AIInteraction[]
+  employees     Employee[]      @relation("EmployeeManager")
+  managedTasks  Task[]          @relation("TaskManager")
+  transactions  Transaction[]
+}
+
+// =============================================
+// EMPLOYEE (HR MODULE)
+// =============================================
+model Employee {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  firstName        String
+  lastName         String
+  email            String    @unique
+  phone            String?
+  position         String
+  department       String
+  salary           Float
+  hireDate         DateTime
+  status           String    @default("active")
+  address          String?
+  emergencyContact String?
+  bankInfo         String?
+  taxInfo          String?
+  profileImage     String?   // Employee photo
+  companyName      String    // Multi-tenancy
+
+  managerId        String?   @db.ObjectId
+  manager          User?     @relation("EmployeeManager", fields: [managerId], references: [id])
+
+  tasks            Task[]    @relation("TaskAssignment")
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  @@index([companyName])
+}
+
+// =============================================
+// TASK MANAGEMENT
+// =============================================
+model Task {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  description   String?
+  status        String    @default("pending")
+  priority      String    @default("medium")
+  dueDate       DateTime?
+  assignedToId  String?   @db.ObjectId
+  assignedTo    Employee? @relation("TaskAssignment", fields: [assignedToId], references: [id])
+
+  createdById   String    @db.ObjectId
+  createdBy     User      @relation("TaskManager", fields: [createdById], references: [id])
+
+  userId        String?   @db.ObjectId
+  user          User?     @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status], name: "task_status_idx")
+}
+
+// =============================================
+// INVENTORY
+// =============================================
+model InventoryItem {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  description   String?
+  sku           String
+  quantity      Int           @default(0)
+  unit          String
+  price         Float
+  cost          Float
+  category      String?
+  supplier      String?
+  reorderLevel  Int           @default(10)
+  location      String?
+  barcode       String?
+  image         String?
+  companyName   String        // Multi-tenancy
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  orderItems    OrderItem[]
+
+  @@unique([sku, companyName], name: "inventory_sku_company_unique")
+  @@index([category], name: "inventory_category_idx")
+  @@index([companyName])
+}
+
+// =============================================
+// ORDER MODEL
+// =============================================
+model Order {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  orderNumber   String        @unique
+  customerName  String
+  customerEmail String?
+  customerPhone String?
+
+  status        String        @default("pending")
+  totalAmount   Float
+  taxAmount     Float         @default(0)
+  discount      Float         @default(0)
+
+  paymentStatus String        @default("unpaid")
+  paymentMethod String?
+
+  createdById   String        @db.ObjectId
+  createdBy     User          @relation(fields: [createdById], references: [id])
+
+  items         OrderItem[]
+  payments      Payment[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status], name: "order_status_idx")
+  @@index([paymentStatus], name: "order_payment_status_idx")
+}
+
+// =============================================
+// ORDER ITEM
+// =============================================
+model OrderItem {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+
+  orderId       String        @db.ObjectId
+  order         Order         @relation(fields: [orderId], references: [id])
+
+  itemId        String        @db.ObjectId
+  item          InventoryItem @relation(fields: [itemId], references: [id])
+
+  quantity      Int
+  unitPrice     Float
+  totalPrice    Float
+  notes         String?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+// =============================================
+// PAYMENTS (CHAPA)
+// =============================================
+model Payment {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId        String    @db.ObjectId
+  user          User      @relation(fields: [userId], references: [id])
+
+  amount        Float
+  currency      String    @default("ETB")
+  txRef         String    @unique
+  status        String    @default("pending")
+  paymentMethod String?
+
+  orderId       String?   @db.ObjectId
+  order         Order?    @relation(fields: [orderId], references: [id])
+
+  metadata      Json?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// =============================================
+// CHAT HISTORY
+// =============================================
+model ChatHistory {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String    @db.ObjectId
+  user          User      @relation(fields: [userId], references: [id])
+
+  role          String
+  content       String
+  timestamp     DateTime  @default(now())
+}
+
+// =============================================
+// AI INTERACTIONS LOG
+// =============================================
+model AIInteraction {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String    @db.ObjectId
+  user          User      @relation(fields: [userId], references: [id])
+
+  input         String
+  output        String
+  metadata      Json?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// =============================================
+// NOTIFICATIONS
+// =============================================
+model Notification {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String    @db.ObjectId
+  user          User      @relation(fields: [userId], references: [id])
+
+  title         String
+  message       String
+  type          String
+  isRead        Boolean   @default(false)
+  link          String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
