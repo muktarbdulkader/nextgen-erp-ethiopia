@@ -278,7 +278,7 @@ All rights reserved.
 
 For support:
 
-* Email: **[support@muktiap.com](mailto:support@muktiap.com)**
+* Email: **[support@muktiap.com](mailto:muktarabdulkader35@gmail.com)**
 * Or open an issue in the repository
 
 ---
