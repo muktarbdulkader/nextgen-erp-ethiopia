@@ -207,7 +207,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick, user, language, s
              </div>
              <div className="hidden md:block text-left">
                <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{user ? user.firstName : 'Guest'}</div>
-               <div className="text-[10px] text-slate-500 truncate max-w-[80px]">{user ? user.companyName : 'Visitor'}</div>
+               <div className="text-[10px] text-slate-500 truncate max-w-[80px]">{user ? (user.displayCompanyName || user.companyName) : 'Visitor'}</div>
              </div>
              <ChevronDown size={14} className={`text-slate-400 hidden sm:block transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
           </button>

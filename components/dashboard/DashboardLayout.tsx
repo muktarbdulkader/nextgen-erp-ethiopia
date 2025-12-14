@@ -8,6 +8,13 @@ import { Documentation } from './Documentation';
 import { TaskModule } from './TaskModule';
 import { FinanceModule } from './FinanceModule';
 import { SettingsModule } from './SettingsModule';
+import { SettingsPage } from './SettingsPage';
+import { CRMModule } from './CRMModule';
+import { MarketingModule } from './MarketingModule';
+import { ProcurementModule } from './ProcurementModule';
+import { SupplyChainModule } from './SupplyChainModule';
+import { ExpensesModule } from './ExpensesModule';
+import { PayrollModule } from './PayrollModule';
 import { InvoiceModal } from './InvoiceModal';
 import { AddEmployeeModal } from './AddEmployeeModal';
 import { LowStockModal } from './LowStockModal';
@@ -46,6 +53,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [isLoadingModule, setIsLoadingModule] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
   // Data State
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -207,6 +215,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-slate-100 font-sans overflow-hidden">
       <Sidebar 
+        key={sidebarRefreshKey}
         currentModule={activeModule === 'billing' ? 'settings' : activeModule} 
         setModule={handleSetModule} 
         onLogout={handleLogout} 
@@ -361,9 +370,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
             {activeModule === 'tasks' && <TaskModule key={`tasks-${refreshKey}`} language={language} />}
             {activeModule === 'finance' && <FinanceModule key={`finance-${refreshKey}`} language={language} onRefresh={refreshDashboard} />}
             {activeModule === 'inventory' && <InventoryModule key={`inventory-${refreshKey}`} language={language} onAddItem={() => setShowAddItem(true)} onRefresh={refreshDashboard} />}
-            {activeModule === 'hr' && <HRModule key={`hr-${refreshKey}`} language={language} onAddEmployee={() => setShowAddEmployee(true)} onDeleteEmployee={handleDeleteEmployee} employees={employees} />}
+            {activeModule === 'hr' && <HRModule key={`hr-${refreshKey}`} language={language} onAddEmployee={() => setShowAddEmployee(true)} />}
             {activeModule === 'sales' && <SalesModule key={`sales-${refreshKey}`} language={language} onRefresh={refreshDashboard} />}
-            {activeModule === 'settings' && <SettingsModule user={user} onUpdateUser={onUpdateUser} language={language} initialTab="profile" onUpgrade={handleUpgrade} />}
+            {activeModule === 'crm' && <CRMModule key={`crm-${refreshKey}`} language={language} />}
+            {activeModule === 'marketing' && <MarketingModule key={`marketing-${refreshKey}`} language={language} />}
+            {activeModule === 'procurement' && <ProcurementModule key={`procurement-${refreshKey}`} language={language} />}
+            {activeModule === 'supply-chain' && <SupplyChainModule key={`supply-chain-${refreshKey}`} language={language} />}
+            {activeModule === 'expenses' && <ExpensesModule key={`expenses-${refreshKey}`} language={language} />}
+            {activeModule === 'payroll' && <PayrollModule key={`payroll-${refreshKey}`} language={language} />}
+            {activeModule === 'settings' && <SettingsPage onModulesUpdated={() => setSidebarRefreshKey(prev => prev + 1)} />}
             {activeModule === 'billing' && <SettingsModule user={user} onUpdateUser={onUpdateUser} language={language} initialTab="billing" onUpgrade={handleUpgrade} />}
             {activeModule === 'docs' && <Documentation />}
             
@@ -421,7 +436,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
         isOpen={showChapa} 
         onClose={() => setShowChapa(false)} 
         mode={chapaMode}
-        companyName={user?.companyName || 'Your Company'}
+        companyName={user?.displayCompanyName || user?.companyName || 'Your Company'}
       />
       <InvoiceModal isOpen={showInvoice} onClose={() => setShowInvoice(false)} />
       <ContactModal isOpen={showContact} onClose={() => setShowContact(false)} language={language} />

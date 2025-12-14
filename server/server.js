@@ -24,17 +24,28 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'http://10.232.83.59:3000',
-  'http://172.29.176.1:3000',   // ← Added for your network
-  'http://172.21.48.1:3000',    // ← Added for your network
-  process.env.FRONTEND_URL
+  'http://172.29.176.1:3000',
+  'http://172.21.48.1:3000',
+  process.env.FRONTEND_URL,
+  // Vercel domains - add your actual Vercel URL here
+  'https://muktiap.vercel.app',
+  'https://muktiap-erp.vercel.app',
 ].filter(Boolean);
+
+// Also allow any .vercel.app subdomain for preview deployments
+const isVercelDomain = (origin) => origin && origin.endsWith('.vercel.app');
 
 // CORS middleware
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Allow if in allowedOrigins list or is a Vercel domain
+    if (allowedOrigins.includes(origin) || isVercelDomain(origin)) {
       return callback(null, true);
     }
+    
     console.log("❌ Blocked by CORS:", origin);
     return callback(new Error("Not allowed by CORS"));
   },

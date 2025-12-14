@@ -20,7 +20,8 @@ export interface User {
   firstName: string;
   lastName: string;
   email: string;
-  companyName: string;
+  companyName: string; // Used for data isolation (always email)
+  displayCompanyName?: string; // Actual company name for display
   profileImage?: string;
   plan?: string;
 }
@@ -31,7 +32,7 @@ export interface Feature {
   icon: React.ReactNode;
 }
 
-export type ModuleType = 'overview' | 'finance' | 'inventory' | 'sales' | 'hr' | 'tasks' | 'ai-chat' | 'docs' | 'settings' | 'billing';
+export type ModuleType = 'overview' | 'finance' | 'inventory' | 'sales' | 'hr' | 'tasks' | 'ai-chat' | 'docs' | 'settings' | 'billing' | 'crm' | 'marketing' | 'procurement' | 'supply-chain' | 'expenses' | 'payroll';
 
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';

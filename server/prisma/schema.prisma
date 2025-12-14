@@ -62,7 +62,8 @@ model User {
   lastName      String
   email         String          @unique
   password      String
-  companyName   String
+  companyName   String          // Always set to email for data isolation (unique per user)
+  displayCompanyName String?    // The actual company name entered by user for display
   plan          String          @default("Starter")
   role          String          @default("user")
   createdAt     DateTime        @default(now())
@@ -86,7 +87,7 @@ model Employee {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
   firstName        String
   lastName         String
-  email            String    @unique
+  email            String
   phone            String?
   position         String
   department       String
@@ -108,6 +109,7 @@ model Employee {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   
+  @@unique([email, companyName])  // Email unique per company
   @@index([companyName])
 }
 
@@ -308,4 +310,284 @@ model PartnerRequest {
 
   @@index([email])
   @@index([status])
+}
+
+// =============================================
+// MODULE SETTINGS
+// =============================================
+model ModuleSettings {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  companyName   String    @unique  // One settings per company
+  enabledModules Json     // Array of enabled module IDs
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// =============================================
+// ORGANIZATION SETTINGS
+// =============================================
+model OrganizationSettings {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  companyName   String    @unique
+  tinNumber     String?
+  businessType  String?
+  industry      String?
+  address       String?
+  phone         String?
+  email         String?
+  currency      String    @default("ETB")
+  timezone      String    @default("Africa/Addis_Ababa")
+  dateFormat    String    @default("DD/MM/YYYY")
+  vatRate       Float     @default(15)
+  withholdingTax Float    @default(2)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// =============================================
+// CRM - LEADS
+// =============================================
+model Lead {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  company       String?
+  email         String
+  phone         String?
+  status        String    @default("Cold")  // Hot, Warm, Cold
+  value         Float?
+  source        String?
+  notes         String?
+  lastContact   DateTime?
+  companyName   String    // Multi-tenancy
+  userId        String    @db.ObjectId
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyName])
+  @@index([status])
+}
+
+// =============================================
+// MARKETING - CAMPAIGNS
+// =============================================
+model Campaign {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  status        String    @default("Draft")  // Draft, Active, Scheduled, Completed
+  type          String    @default("Email")  // Email, SMS, Social
+  sent          Int       @default(0)
+  opened        Int       @default(0)
+  clicked       Int       @default(0)
+  conversions   Int       @default(0)
+  scheduledDate DateTime?
+  companyName   String    // Multi-tenancy
+  userId        String    @db.ObjectId
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyName])
+  @@index([status])
+}
+
+// =============================================
+// PROCUREMENT - PURCHASE ORDERS
+// =============================================
+model PurchaseOrder {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderNumber   String    @unique
+  supplier      String
+  status        String    @default("Pending")  // Pending, Approved, Received, Cancelled
+  totalAmount   Float
+  items         Json      // Array of items
+  deliveryDate  DateTime?
+  notes         String?
+  companyName   String    // Multi-tenancy
+  userId        String    @db.ObjectId
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyName])
+  @@index([status])
+}
+
+// =============================================
+// EXPENSES
+// =============================================
+model Expense {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  amount        Float
+  category      String
+  status        String    @default("Pending")  // Pending, Approved, Rejected
+  date          DateTime  @default(now())
+  receipt       String?   // File URL
+  description   String?
+  employeeId    String?   @db.ObjectId
+  companyName   String    // Multi-tenancy
+  userId        String    @db.ObjectId
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyName])
+  @@index([status])
+}
+
+// =============================================
+// PAYROLL
+// =============================================
+model Payroll {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId    String    @db.ObjectId
+  month         String    // Format: YYYY-MM
+  basicSalary   Float
+  allowances    Float     @default(0)
+  deductions    Float     @default(0)
+  tax           Float     @default(0)
+  netSalary     Float
+  status        String    @default("Pending")  // Pending, Processed, Paid
+  paymentDate   DateTime?
+  companyName   String    // Multi-tenancy
+  userId        String    @db.ObjectId
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyName])
+  @@index([employeeId])
+  @@index([month])
+}
+
+// =============================================
+// NOTIFICATION SETTINGS
+// =============================================
+model NotificationSettings {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String    @unique @db.ObjectId
+  emailNotifications Json  // Object with notification types
+  inAppNotifications Json  // Object with notification types
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// =============================================
+// INTEGRATIONS
+// =============================================
+model Integration {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  companyName   String
+  name          String    // chapa, google, slack, etc.
+  status        String    @default("disconnected")  // connected, disconnected
+  apiKey        String?
+  config        Json?     // Additional configuration
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([companyName, name])
+  @@index([companyName])
+}
+
+// =============================================
+// ROLES (Per Company)
+// =============================================
+model Role {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String    // Admin, Manager, User, Viewer, or custom
+  description   String?
+  permissions   String[]  // Array of permission strings
+  isDefault     Boolean   @default(false)  // Default roles can't be deleted
+  companyName   String
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([name, companyName])
+  @@index([companyName])
+}
+
+// =============================================
+// TEAM MEMBERS (Users per Company)
+// =============================================
+model TeamMember {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String?   @db.ObjectId  // Link to User if registered
+  email         String
+  name          String
+  role          String    @default("User")  // Admin, Manager, User, Viewer
+  status        String    @default("Pending")  // Active, Pending, Inactive
+  permissions   Json?     // Custom permissions override
+  invitedBy     String    @db.ObjectId
+  companyName   String
+  lastActive    DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([email, companyName])
+  @@index([companyName])
+}
+
+// =============================================
+// KNOWLEDGE BASE ARTICLES
+// =============================================
+model KnowledgeArticle {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  content       String
+  category      String
+  tags          String[]
+  views         Int       @default(0)
+  isPublic      Boolean   @default(true)
+  companyName   String?   // null = global article
+  authorId      String    @db.ObjectId
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([category])
+  @@index([companyName])
+}
+
+// =============================================
+// AUDIT LOG
+// =============================================
+model AuditLog {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  action        String    // create, update, delete, login, etc.
+  entity        String    // user, order, payment, etc.
+  entityId      String?
+  details       Json?
+  userId        String    @db.ObjectId
+  companyName   String
+  ipAddress     String?
+
+  createdAt     DateTime  @default(now())
+
+  @@index([companyName])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// =============================================
+// COMPANY ACCESS CODES (For Role Registration)
+// =============================================
+model CompanyAccessCode {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  companyName   String
+  role          String    // Admin, Manager
+  code          String    // Hashed access code
+  createdBy     String    @db.ObjectId
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([companyName, role])
+  @@index([companyName])
 }

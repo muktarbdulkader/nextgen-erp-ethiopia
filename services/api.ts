@@ -131,25 +131,59 @@ export async function fetchClient<T>(endpoint: string, options: RequestInit = {}
 export const api = {
   auth: {
     login: async (email: string, password: string): Promise<User> => {
-      const data = await fetchClient<{ token: string, user: User }>('/auth/login', {
+      const data = await fetchClient<{ token: string, user: User & { permissions?: string[] } }>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password })
       });
       localStorage.setItem('auth_token', data.token);
+      // Store user info with permissions
+      localStorage.setItem('user_info', JSON.stringify(data.user));
       return data.user;
     },
 
     register: async (userData: any): Promise<User> => {
-      const data = await fetchClient<{ token: string, user: User }>('/auth/register', {
+      const data = await fetchClient<{ token: string, user: User & { permissions?: string[] } }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(userData)
       });
       localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('user_info', JSON.stringify(data.user));
       return data.user;
     },
     
     logout: () => {
-        localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_info');
+    },
+
+    getMe: async (): Promise<User & { permissions: string[], role: string }> => {
+      const user = await fetchClient<User & { permissions: string[], role: string }>('/auth/me');
+      localStorage.setItem('user_info', JSON.stringify(user));
+      return user;
+    },
+
+    // Get current user from localStorage
+    getCurrentUser: (): { permissions: string[], role: string, companyName: string } | null => {
+      try {
+        const userInfo = localStorage.getItem('user_info');
+        return userInfo ? JSON.parse(userInfo) : null;
+      } catch {
+        return null;
+      }
+    },
+
+    // Check if user has permission
+    hasPermission: (permission: string): boolean => {
+      const user = api.auth.getCurrentUser();
+      if (!user) return false;
+      if (user.role === 'Admin' || user.permissions?.includes('Full Access')) return true;
+      return user.permissions?.includes(permission) || false;
+    },
+
+    // Check if user is Admin
+    isAdmin: (): boolean => {
+      const user = api.auth.getCurrentUser();
+      return user?.role === 'Admin' || user?.permissions?.includes('Full Access') || false;
     }
   },
 
@@ -289,6 +323,249 @@ export const api = {
             method: 'POST',
             body: JSON.stringify(order)
         });
+    }
+  },
+
+  settings: {
+    getModuleSettings: async (): Promise<{ enabledModules: string[] }> => {
+        return await fetchClient<{ enabledModules: string[] }>('/settings/modules');
+    },
+    updateModuleSettings: async (enabledModules: string[]): Promise<any> => {
+        return await fetchClient<any>('/settings/modules', {
+            method: 'PUT',
+            body: JSON.stringify({ enabledModules })
+        });
+    },
+    toggleModule: async (moduleId: string): Promise<any> => {
+        return await fetchClient<any>('/settings/modules/toggle', {
+            method: 'POST',
+            body: JSON.stringify({ moduleId })
+        });
+    },
+    // Organization settings
+    getOrganization: async (): Promise<any> => {
+        return await fetchClient<any>('/settings/organization');
+    },
+    updateOrganization: async (data: any): Promise<any> => {
+        return await fetchClient<any>('/settings/organization', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    // Notification settings
+    getNotifications: async (): Promise<any> => {
+        return await fetchClient<any>('/settings/notifications');
+    },
+    updateNotifications: async (data: any): Promise<any> => {
+        return await fetchClient<any>('/settings/notifications', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    // Integrations
+    getIntegrations: async (): Promise<any[]> => {
+        return await fetchClient<any[]>('/settings/integrations');
+    },
+    connectIntegration: async (name: string, config: any): Promise<any> => {
+        return await fetchClient<any>('/settings/integrations', {
+            method: 'POST',
+            body: JSON.stringify({ name, ...config })
+        });
+    },
+    disconnectIntegration: async (name: string): Promise<any> => {
+        return await fetchClient<any>(`/settings/integrations/${name}`, {
+            method: 'DELETE'
+        });
+    }
+  },
+
+  teamMembers: {
+    getAll: async (): Promise<any[]> => {
+        return await fetchClient<any[]>('/team-members');
+    },
+    invite: async (data: { email: string; name: string; role: string }): Promise<any> => {
+        return await fetchClient<any>('/team-members', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+    update: async (id: string, data: any): Promise<any> => {
+        return await fetchClient<any>(`/team-members/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    remove: async (id: string): Promise<any> => {
+        return await fetchClient<any>(`/team-members/${id}`, {
+            method: 'DELETE'
+        });
+    },
+    getRoles: async (): Promise<any[]> => {
+        return await fetchClient<any[]>('/roles');
+    }
+  },
+
+  roles: {
+    getAll: async (): Promise<any[]> => {
+        return await fetchClient<any[]>('/roles');
+    },
+    create: async (data: { name: string; description?: string; permissions: string[] }): Promise<any> => {
+        return await fetchClient<any>('/roles', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+    update: async (id: string, data: any): Promise<any> => {
+        return await fetchClient<any>(`/roles/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    delete: async (id: string): Promise<any> => {
+        return await fetchClient<any>(`/roles/${id}`, {
+            method: 'DELETE'
+        });
+    }
+  },
+
+  knowledge: {
+    getArticles: async (params?: { category?: string; search?: string }): Promise<any[]> => {
+        const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+        return await fetchClient<any[]>(`/knowledge/articles${query}`);
+    },
+    getArticle: async (id: string): Promise<any> => {
+        return await fetchClient<any>(`/knowledge/articles/${id}`);
+    },
+    createArticle: async (data: any): Promise<any> => {
+        return await fetchClient<any>('/knowledge/articles', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+    updateArticle: async (id: string, data: any): Promise<any> => {
+        return await fetchClient<any>(`/knowledge/articles/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    deleteArticle: async (id: string): Promise<any> => {
+        return await fetchClient<any>(`/knowledge/articles/${id}`, {
+            method: 'DELETE'
+        });
+    },
+    getCategories: async (): Promise<string[]> => {
+        return await fetchClient<string[]>('/knowledge/categories');
+    },
+    getStats: async (): Promise<any> => {
+        return await fetchClient<any>('/knowledge/stats');
+    }
+  },
+
+  expenses: {
+    getAll: async (): Promise<any[]> => {
+        return await fetchClient<any[]>('/expenses');
+    },
+    create: async (expense: any): Promise<any> => {
+        return await fetchClient<any>('/expenses', {
+            method: 'POST',
+            body: JSON.stringify(expense)
+        });
+    },
+    update: async (id: string, data: any): Promise<any> => {
+        return await fetchClient<any>(`/expenses/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    getStats: async (): Promise<any> => {
+        return await fetchClient<any>('/expenses/stats');
+    }
+  },
+
+  payroll: {
+    getAll: async (month?: string): Promise<any[]> => {
+        const query = month ? `?month=${month}` : '';
+        return await fetchClient<any[]>(`/payroll${query}`);
+    },
+    create: async (payroll: any): Promise<any> => {
+        return await fetchClient<any>('/payroll', {
+            method: 'POST',
+            body: JSON.stringify(payroll)
+        });
+    },
+    update: async (id: string, data: any): Promise<any> => {
+        return await fetchClient<any>(`/payroll/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    getStats: async (): Promise<any> => {
+        return await fetchClient<any>('/payroll/stats');
+    }
+  },
+
+  procurement: {
+    getAll: async (): Promise<any[]> => {
+        return await fetchClient<any[]>('/procurement/orders');
+    },
+    create: async (order: any): Promise<any> => {
+        return await fetchClient<any>('/procurement/orders', {
+            method: 'POST',
+            body: JSON.stringify(order)
+        });
+    },
+    update: async (id: string, data: any): Promise<any> => {
+        return await fetchClient<any>(`/procurement/orders/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    }
+  },
+
+  crm: {
+    getLeads: async (): Promise<any[]> => {
+        return await fetchClient<any[]>('/crm/leads');
+    },
+    createLead: async (lead: any): Promise<any> => {
+        return await fetchClient<any>('/crm/leads', {
+            method: 'POST',
+            body: JSON.stringify(lead)
+        });
+    },
+    updateLead: async (id: string, data: any): Promise<any> => {
+        return await fetchClient<any>(`/crm/leads/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    deleteLead: async (id: string): Promise<any> => {
+        return await fetchClient<any>(`/crm/leads/${id}`, {
+            method: 'DELETE'
+        });
+    },
+    getStats: async (): Promise<any> => {
+        return await fetchClient<any>('/crm/stats');
+    }
+  },
+
+  marketing: {
+    getCampaigns: async (): Promise<any[]> => {
+        return await fetchClient<any[]>('/marketing/campaigns');
+    },
+    createCampaign: async (campaign: any): Promise<any> => {
+        return await fetchClient<any>('/marketing/campaigns', {
+            method: 'POST',
+            body: JSON.stringify(campaign)
+        });
+    },
+    updateCampaign: async (id: string, data: any): Promise<any> => {
+        return await fetchClient<any>(`/marketing/campaigns/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    getStats: async (): Promise<any> => {
+        return await fetchClient<any>('/marketing/stats');
     }
   }
 };

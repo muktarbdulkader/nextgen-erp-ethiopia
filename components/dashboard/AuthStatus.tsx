@@ -34,7 +34,7 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({ user }) => {
       setTokenInfo({
         userId: payload.userId,
         email: payload.email,
-        companyName: payload.companyName,
+        companyName: payload.displayCompanyName || payload.companyName,
         expiresAt,
         expired
       });

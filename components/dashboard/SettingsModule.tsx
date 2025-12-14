@@ -29,7 +29,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ user, onUpdateUs
         firstName: user?.firstName || '',
         lastName: user?.lastName || '',
         email: user?.email || '',
-        companyName: user?.companyName || '',
+        companyName: user?.displayCompanyName || user?.companyName || '',
         profileImage: user?.profileImage || ''
     });
 

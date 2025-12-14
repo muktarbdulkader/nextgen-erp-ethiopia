@@ -37,6 +37,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   
   // State for Editing Account
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -78,6 +80,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
   const totalBalance = accounts.reduce((acc, curr) => acc + curr.balance, 0);
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
   const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+
+  // Filtered transactions
+  const filteredTransactions = transactions.filter(tx => {
+    const matchesStatus = statusFilter === 'all' || tx.status === statusFilter;
+    const matchesType = typeFilter === 'all' || tx.type === typeFilter;
+    return matchesStatus && matchesType;
+  });
+
+  // Status counts
+  const statusCounts = {
+    all: transactions.length,
+    paid: transactions.filter(t => t.status === 'paid').length,
+    pending: transactions.filter(t => t.status === 'pending').length
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-ET', { style: 'currency', currency: 'ETB' }).format(amount);
@@ -353,12 +369,60 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
 
           {/* Transactions List */}
           <div className="bg-white dark:bg-dark-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-              <h3 className={`font-bold text-lg ${language === 'AM' ? 'ethiopic-text' : ''}`}>{t.transactionHistory}</h3>
-              <Button variant="ghost" size="sm" onClick={handleDownloadReport}>
-                <Download className="mr-2 h-4 w-4"/>
-                Download Report
-              </Button>
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h3 className={`font-bold text-lg ${language === 'AM' ? 'ethiopic-text' : ''}`}>{t.transactionHistory}</h3>
+                <Button variant="ghost" size="sm" onClick={handleDownloadReport}>
+                  <Download className="mr-2 h-4 w-4"/>
+                  Download Report
+                </Button>
+              </div>
+              
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap gap-2 mt-4">
+                {/* Status Filter */}
+                <div className="flex bg-slate-100 dark:bg-dark-700 p-1 rounded-lg">
+                  {(['all', 'paid', 'pending'] as const).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setStatusFilter(status)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                        statusFilter === status
+                          ? 'bg-white dark:bg-dark-600 shadow-sm text-brand-600'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {status === 'paid' && <CheckCircle2 size={14} className="text-green-500" />}
+                      {status === 'pending' && <span className="w-2 h-2 rounded-full bg-amber-500" />}
+                      {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                      <span className={`px-1.5 py-0.5 rounded text-xs ${
+                        statusFilter === status ? 'bg-brand-100 dark:bg-brand-900/30' : 'bg-slate-200 dark:bg-dark-600'
+                      }`}>
+                        {statusCounts[status]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Type Filter */}
+                <div className="flex bg-slate-100 dark:bg-dark-700 p-1 rounded-lg">
+                  {(['all', 'income', 'expense'] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setTypeFilter(type)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                        typeFilter === type
+                          ? 'bg-white dark:bg-dark-600 shadow-sm text-brand-600'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {type === 'income' && <ArrowDownLeft size={14} className="text-green-500" />}
+                      {type === 'expense' && <ArrowUpRight size={14} className="text-red-500" />}
+                      {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
@@ -375,9 +439,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {isLoading ? (
                       <tr><td colSpan={6} className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-500"/></td></tr>
-                  ) : transactions.length === 0 ? (
-                      <tr><td colSpan={6} className="text-center py-8 text-slate-500">No transactions recorded yet.</td></tr>
-                  ) : transactions.map((tx) => (
+                  ) : filteredTransactions.length === 0 ? (
+                      <tr><td colSpan={6} className="text-center py-8 text-slate-500">
+                        {transactions.length === 0 ? 'No transactions recorded yet.' : `No ${statusFilter !== 'all' ? statusFilter : ''} ${typeFilter !== 'all' ? typeFilter : ''} transactions found.`}
+                      </td></tr>
+                  ) : filteredTransactions.map((tx) => (
                     <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-dark-700/50 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-900 dark:text-white flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${

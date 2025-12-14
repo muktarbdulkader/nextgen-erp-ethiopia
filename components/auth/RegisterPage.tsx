@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthLayout } from './AuthLayout';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { Mail, Lock, User as UserIcon, Building2, Loader2, CheckCircle, Github, Globe, CreditCard } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, Building2, Loader2, CheckCircle, Github, Globe, CreditCard, Shield } from 'lucide-react';
 import { User, LanguageCode } from '../../types';
 import { translations } from '../../utils/translations';
 import { api } from '../../services/api';
@@ -26,7 +26,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNaviga
     email: '',
     password: '',
     country: 'Ethiopia',
-    plan: selectedPlan || 'Starter'
+    plan: selectedPlan || 'Starter',
+    role: 'User',
+    adminCode: ''
   });
 
   useEffect(() => {
@@ -182,6 +184,69 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNaviga
             value={formData.password}
             onChange={handleChange}
         />
+
+        {/* Role Selection */}
+        <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Your Role
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+                {[
+                    { value: 'Admin', label: 'Admin', desc: 'Full access to all features', icon: '👑', requiresCode: true },
+                    { value: 'Manager', label: 'Manager', desc: 'Manage team & reports', icon: '📊', requiresCode: true },
+                    { value: 'User', label: 'User', desc: 'Create & edit records', icon: '👤', requiresCode: false },
+                    { value: 'Viewer', label: 'Viewer', desc: 'View data only', icon: '👁️', requiresCode: false }
+                ].map((role) => (
+                    <button
+                        key={role.value}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, role: role.value, adminCode: '' })}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                            formData.role === role.value
+                                ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
+                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2 mb-1">
+                            <span>{role.icon}</span>
+                            <span className={`font-semibold text-sm ${
+                                formData.role === role.value ? 'text-brand-700 dark:text-brand-400' : 'text-slate-700 dark:text-slate-300'
+                            }`}>{role.label}</span>
+                            {role.requiresCode && <Shield size={12} className="text-amber-500" />}
+                        </div>
+                        <p className="text-xs text-slate-500">{role.desc}</p>
+                    </button>
+                ))}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+                {formData.role === 'Admin' && '✓ You will have full control over all company data and settings'}
+                {formData.role === 'Manager' && '✓ You can manage team, view reports, and approve requests'}
+                {formData.role === 'User' && '✓ You can view, create, and edit your own records'}
+                {formData.role === 'Viewer' && '✓ You can only view data without making changes'}
+            </p>
+        </div>
+
+        {/* Admin/Manager - Enter Access Code */}
+        {(formData.role === 'Admin' || formData.role === 'Manager') && (
+            <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                <label className="block text-sm font-medium text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                    <Shield size={16} />
+                    {formData.role} Access Code Required
+                </label>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Enter the {formData.role.toLowerCase()} access code to register with this role. Contact your system administrator if you don't have the code.
+                </p>
+                <Input 
+                    name="adminCode" 
+                    type="password" 
+                    placeholder={`Enter ${formData.role.toLowerCase()} access code`}
+                    icon={Lock} 
+                    required 
+                    value={formData.adminCode}
+                    onChange={handleChange}
+                />
+            </div>
+        )}
         
         <div className="flex items-start gap-2 pt-2">
             <input type="checkbox" id="terms" className="mt-1 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" required />

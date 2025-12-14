@@ -14,7 +14,19 @@ const notificationController = require('../controllers/notificationController');
 const partnerController = require('../controllers/partnerController');
 const paymentController = require('../controllers/paymentController');
 const aiController = require('../controllers/aiController');
+const settingsController = require('../controllers/settingsController');
+const organizationController = require('../controllers/organizationController');
+const crmController = require('../controllers/crmController');
+const marketingController = require('../controllers/marketingController');
+const procurementController = require('../controllers/procurementController');
+const expenseController = require('../controllers/expenseController');
+const payrollController = require('../controllers/payrollController');
+const notificationSettingsController = require('../controllers/notificationSettingsController');
+const integrationController = require('../controllers/integrationController');
+const teamMemberController = require('../controllers/teamMemberController');
+const knowledgeController = require('../controllers/knowledgeController');
 const authenticateToken = require('../middleware/auth');
+const { checkPermission, isAdmin } = require('../middleware/checkPermission');
 
 // ------------------------------------------
 // PUBLIC ROUTES
@@ -22,6 +34,8 @@ const authenticateToken = require('../middleware/auth');
 
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
+// Protected auth routes (after authenticateToken middleware)
+// router.get('/auth/me', authController.getMe); // Added below after auth middleware
 
 // Partner request (public form)
 router.post('/partner', partnerController.submitRequest);
@@ -48,6 +62,12 @@ if (process.env.NODE_ENV !== 'production') {
 router.use(authenticateToken);
 
 // ------------------------------------------
+// AUTH - GET CURRENT USER
+// ------------------------------------------
+
+router.get('/auth/me', authController.getMe);
+
+// ------------------------------------------
 // AI ASSISTANT (Backend-secured Gemini Chat)
 // ------------------------------------------
 
@@ -59,6 +79,100 @@ router.post('/ai/chat', aiController.aiRateLimiter, ...aiController.chat);
 // ------------------------------------------
 
 router.get('/dashboard/stats', dashboardController.getStats);
+
+// ------------------------------------------
+// SETTINGS
+// ------------------------------------------
+
+router.get('/settings/modules', settingsController.getModuleSettings);
+router.put('/settings/modules', settingsController.updateModuleSettings);
+router.post('/settings/modules/toggle', settingsController.toggleModule);
+
+router.get('/settings/organization', organizationController.getSettings);
+router.put('/settings/organization', organizationController.updateSettings);
+
+router.get('/settings/notifications', notificationSettingsController.getSettings);
+router.put('/settings/notifications', notificationSettingsController.updateSettings);
+
+router.get('/settings/integrations', integrationController.getIntegrations);
+router.post('/settings/integrations', integrationController.connectIntegration);
+router.delete('/settings/integrations/:name', integrationController.disconnectIntegration);
+
+// ------------------------------------------
+// TEAM MEMBERS (Admin/Manager can manage)
+// ------------------------------------------
+
+router.get('/team-members', checkPermission('User Management'), teamMemberController.getTeamMembers);
+router.post('/team-members', checkPermission('User Management'), teamMemberController.inviteTeamMember);
+router.put('/team-members/:id', checkPermission('User Management'), teamMemberController.updateTeamMember);
+router.delete('/team-members/:id', checkPermission('User Management'), teamMemberController.removeTeamMember);
+
+// ------------------------------------------
+// ROLES (Admin only)
+// ------------------------------------------
+
+router.get('/roles', teamMemberController.getRoles); // Anyone can view roles
+router.post('/roles', isAdmin, teamMemberController.createRole);
+router.put('/roles/:id', isAdmin, teamMemberController.updateRole);
+router.delete('/roles/:id', isAdmin, teamMemberController.deleteRole);
+router.get('/team-members/roles', teamMemberController.getRolePermissions); // Legacy
+
+// ------------------------------------------
+// KNOWLEDGE BASE
+// ------------------------------------------
+
+router.get('/knowledge/articles', knowledgeController.getArticles);
+router.get('/knowledge/articles/:id', knowledgeController.getArticle);
+router.post('/knowledge/articles', knowledgeController.createArticle);
+router.put('/knowledge/articles/:id', knowledgeController.updateArticle);
+router.delete('/knowledge/articles/:id', knowledgeController.deleteArticle);
+router.get('/knowledge/categories', knowledgeController.getCategories);
+router.get('/knowledge/stats', knowledgeController.getStats);
+
+// ------------------------------------------
+// CRM
+// ------------------------------------------
+
+router.get('/crm/leads', crmController.getLeads);
+router.post('/crm/leads', crmController.createLead);
+router.put('/crm/leads/:id', crmController.updateLead);
+router.delete('/crm/leads/:id', crmController.deleteLead);
+router.get('/crm/stats', crmController.getStats);
+
+// ------------------------------------------
+// MARKETING
+// ------------------------------------------
+
+router.get('/marketing/campaigns', marketingController.getCampaigns);
+router.post('/marketing/campaigns', marketingController.createCampaign);
+router.put('/marketing/campaigns/:id', marketingController.updateCampaign);
+router.get('/marketing/stats', marketingController.getStats);
+
+// ------------------------------------------
+// PROCUREMENT
+// ------------------------------------------
+
+router.get('/procurement/orders', procurementController.getPurchaseOrders);
+router.post('/procurement/orders', procurementController.createPurchaseOrder);
+router.put('/procurement/orders/:id', procurementController.updatePurchaseOrder);
+
+// ------------------------------------------
+// EXPENSES
+// ------------------------------------------
+
+router.get('/expenses', expenseController.getExpenses);
+router.post('/expenses', expenseController.createExpense);
+router.put('/expenses/:id', expenseController.updateExpense);
+router.get('/expenses/stats', expenseController.getStats);
+
+// ------------------------------------------
+// PAYROLL
+// ------------------------------------------
+
+router.get('/payroll', payrollController.getPayrolls);
+router.post('/payroll', payrollController.createPayroll);
+router.put('/payroll/:id', payrollController.updatePayroll);
+router.get('/payroll/stats', payrollController.getStats);
 
 // ------------------------------------------
 // EMPLOYEES

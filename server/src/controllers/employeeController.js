@@ -84,7 +84,21 @@ exports.createEmployee = async (req, res) => {
       return res.status(400).json({ message: 'Valid hire date is required' });
     }
     
-    console.log('Validation passed, creating employee...');
+    console.log('Validation passed, checking for existing employee...');
+
+    // Check if employee with same email exists in this company
+    const existingEmployee = await prisma.employee.findFirst({
+      where: {
+        email,
+        companyName: req.user.companyName
+      }
+    });
+
+    if (existingEmployee) {
+      return res.status(400).json({ message: 'An employee with this email already exists in your company' });
+    }
+
+    console.log('Creating employee...');
 
     const newEmployee = await prisma.employee.create({
       data: {
