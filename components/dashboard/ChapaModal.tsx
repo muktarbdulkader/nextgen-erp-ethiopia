@@ -75,9 +75,10 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
               setIsLoading(false);
               alert('Failed to initialize payment');
           }
-      } catch (e) {
+      } catch (e: any) {
           console.error("Payment init failed", e);
-          alert('Payment initialization failed. Please try again.');
+          const errorMessage = e?.message || 'Payment initialization failed. Please try again.';
+          alert(errorMessage);
           setIsLoading(false);
       }
   };

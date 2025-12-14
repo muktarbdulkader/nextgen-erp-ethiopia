@@ -230,6 +230,7 @@ router.post('/notifications/read', notificationController.markRead);
 // PAYMENTS (CHAPA)
 // ------------------------------------------
 
+router.get('/payments/config', paymentController.getChapaConfig);
 router.post('/payments/initialize', paymentController.initializePayment);
 router.get('/payments/verify/:tx_ref', paymentController.verifyPayment);
 

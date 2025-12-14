@@ -216,6 +216,9 @@ export const api = {
   },
 
   payment: {
+    getConfig: async () => {
+        return await fetchClient<{ publicKey: string | null; isTestMode: boolean; isConfigured: boolean }>('/payments/config');
+    },
     initialize: async (data: any) => {
         return await fetchClient<any>('/payments/initialize', {
             method: 'POST',

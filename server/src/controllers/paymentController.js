@@ -2,8 +2,14 @@ const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
 const prisma = new PrismaClient();
 
+// Chapa API Configuration
+const CHAPA_PUBLIC_KEY = process.env.CHAPA_PUBLIC_KEY;
 const CHAPA_SECRET_KEY = process.env.CHAPA_SECRET_KEY;
+const CHAPA_ENCRYPTION_KEY = process.env.CHAPA_ENCRYPTION_KEY;
 const CHAPA_BASE_URL = process.env.CHAPA_BASE_URL || 'https://api.chapa.co/v1';
+
+// Check if using test mode
+const isTestMode = CHAPA_SECRET_KEY?.includes('TEST') || !CHAPA_SECRET_KEY;
 
 /* ============================
    INITIALIZE PAYMENT
@@ -78,6 +84,34 @@ exports.initializePayment = async (req, res) => {
     // Check if we have real Chapa credentials
     if (CHAPA_SECRET_KEY && CHAPA_SECRET_KEY !== 'your_chapa_secret_key') {
       try {
+        console.log('🔄 Initializing Chapa payment...');
+        console.log('Secret Key (first 20 chars):', CHAPA_SECRET_KEY?.substring(0, 20) + '...');
+        
+        // Ensure valid values - Chapa requires these fields
+        const customerEmail = (email || req.user.email || 'customer@example.com').trim();
+        const customerFirstName = (firstName || 'Customer').trim() || 'Customer';
+        const customerLastName = (lastName || 'User').trim() || 'User';
+        const paymentAmount = parseFloat(amount);
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(customerEmail)) {
+          return res.status(400).json({ message: 'Invalid email format' });
+        }
+        
+        const requestBody = {
+          amount: paymentAmount.toString(),
+          currency: 'ETB',
+          email: customerEmail,
+          first_name: customerFirstName,
+          last_name: customerLastName,
+          tx_ref: txRef,
+          callback_url: `${process.env.BACKEND_URL || process.env.FRONTEND_URL || 'http://localhost:5001'}/api/payments/webhook`,
+          return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard?tab=finance&payment=success`
+        };
+        
+        console.log('Request body:', JSON.stringify(requestBody, null, 2));
+        
         // Real Chapa API call
         const chapaResponse = await fetch(`${CHAPA_BASE_URL}/transaction/initialize`, {
           method: 'POST',
@@ -85,29 +119,24 @@ exports.initializePayment = async (req, res) => {
             'Authorization': `Bearer ${CHAPA_SECRET_KEY}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            amount: amount.toString(),
-            currency: 'ETB',
-            email: email || req.user.email || 'customer@example.com',
-            first_name: firstName || 'Customer',
-            last_name: lastName || 'User',
-            tx_ref: txRef,
-            callback_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/callback`,
-            return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard?tab=finance`,
-            customization: {
-              title: 'MuktiAp Payment',
-              description: description || 'Payment for services'
-            }
-          })
+          body: JSON.stringify(requestBody)
         });
 
+        const chapaData = await chapaResponse.json();
+        console.log('Chapa Response:', JSON.stringify(chapaData, null, 2));
+
         if (!chapaResponse.ok) {
-          throw new Error('Chapa API request failed');
+          console.error('❌ Chapa API Error:', chapaData);
+          // Return the actual error from Chapa
+          return res.status(400).json({
+            status: 'failed',
+            message: chapaData.message || 'Chapa API request failed',
+            error: chapaData
+          });
         }
 
-        const chapaData = await chapaResponse.json();
-
         if (chapaData.status === 'success' && chapaData.data?.checkout_url) {
+          console.log('✅ Payment initialized successfully');
           return res.json({
             status: 'success',
             message: 'Payment initialized',
@@ -117,10 +146,21 @@ exports.initializePayment = async (req, res) => {
               transaction_id: transaction.id
             }
           });
+        } else {
+          console.error('❌ Unexpected Chapa response:', chapaData);
+          return res.status(400).json({
+            status: 'failed',
+            message: chapaData.message || 'Payment initialization failed',
+            error: chapaData
+          });
         }
       } catch (chapaError) {
-        console.error('Chapa API Error:', chapaError);
-        // Fall through to demo mode
+        console.error('❌ Chapa API Exception:', chapaError.message);
+        return res.status(500).json({
+          status: 'failed',
+          message: 'Chapa API connection failed',
+          error: chapaError.message
+        });
       }
     }
 
@@ -338,5 +378,21 @@ exports.simulatePayment = async (req, res) => {
   } catch (error) {
     console.error('Simulate Payment Error:', error);
     res.status(500).json({ message: 'Simulation failed' });
+  }
+};
+
+/* ============================
+   GET CHAPA CONFIG (PUBLIC KEY)
+============================ */
+
+exports.getChapaConfig = async (req, res) => {
+  try {
+    res.json({
+      publicKey: CHAPA_PUBLIC_KEY || null,
+      isTestMode,
+      isConfigured: !!(CHAPA_SECRET_KEY && CHAPA_SECRET_KEY !== 'your_chapa_secret_key')
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to get Chapa config' });
   }
 };

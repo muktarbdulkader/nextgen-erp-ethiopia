@@ -40,7 +40,12 @@ exports.getSettings = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   try {
     const { companyName } = req.user;
-    const data = req.body;
+    
+    // Remove fields that shouldn't be updated directly
+    const { id, createdAt, updatedAt, ...data } = req.body;
+    
+    // Also remove companyName from data since we use the one from req.user
+    delete data.companyName;
 
     const settings = await prisma.organizationSettings.upsert({
       where: { companyName },
