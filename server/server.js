@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 const apiRoutes = require('./src/routes/api');
 const logger = require('./src/middleware/logger');
@@ -80,8 +81,21 @@ app.use((req, res, next) => {
   }
 })();
 
+// Serve static files from dist (frontend build)
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
+
 // API Routes
 app.use('/api', apiRoutes);
+
+// Serve index.html for all non-API routes (SPA fallback)
+app.get('*', (req, res) => {
+  // Don't serve index.html for API routes
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ message: 'API endpoint not found' });
+  }
+  res.sendFile(path.join(distPath, 'index.html'));
+});
 
 // Health check
 app.get('/health', (_req, res) => {

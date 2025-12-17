@@ -3,7 +3,32 @@ import { User, Employee, Task, Transaction, TaskStatus } from '../types';
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://nextgen-erp-ethiopia.onrender.com/api';
+
+// Determine API URL based on environment
+const getApiUrl = (): string => {
+  // If explicitly set in env, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // In development, use localhost
+  if (import.meta.env.DEV) {
+    return 'http://localhost:5001/api';
+  }
+  
+  // In production, use the same origin as the frontend
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    // Same origin - frontend and backend on same domain
+    return `${protocol}//${host}/api`;
+  }
+  
+  // Fallback
+  return 'https://nextgen-erp-ethiopia.onrender.com/api';
+};
+
+const API_BASE_URL = getApiUrl();
 
 // ==========================================
 // API CLIENT HELPER
