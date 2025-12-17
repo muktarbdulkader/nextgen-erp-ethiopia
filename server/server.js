@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
 
 // Initialize Express
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Trust proxy (for deployment behind reverse proxy)
 app.set('trust proxy', 1);
@@ -28,8 +28,7 @@ const allowedOrigins = [
   'http://172.21.48.1:3000',
   process.env.FRONTEND_URL,
   // Vercel domains
-  'https://muktiap.vercel.app',
-  'https://muktiap-erp.vercel.app',
+  'https://nextgen-erp-ethiopia.vercel.app',
   // Render domains
   'https://nextgen-erp-ethiopia.onrender.com',
 ].filter(Boolean);
