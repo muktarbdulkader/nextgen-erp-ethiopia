@@ -27,9 +27,11 @@ const allowedOrigins = [
   'http://172.29.176.1:3000',
   'http://172.21.48.1:3000',
   process.env.FRONTEND_URL,
-  // Vercel domains - add your actual Vercel URL here
+  // Vercel domains
   'https://muktiap.vercel.app',
   'https://muktiap-erp.vercel.app',
+  // Render domains
+  'https://nextgen-erp-ethiopia.onrender.com',
 ].filter(Boolean);
 
 // Also allow any .vercel.app subdomain for preview deployments
