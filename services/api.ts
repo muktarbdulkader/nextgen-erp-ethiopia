@@ -233,6 +233,12 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ tx_ref: txRef, status })
         });
+    },
+    getHistory: async () => {
+        return await fetchClient<any[]>('/payments/history');
+    },
+    getSubscription: async () => {
+        return await fetchClient<{ plan: string; status: string; nextBillingDate: string; memberSince: string }>('/payments/subscription');
     }
   },
 

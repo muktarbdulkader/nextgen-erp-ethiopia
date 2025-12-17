@@ -1,8 +1,9 @@
-import React from 'react';
-import { X, AlertCircle, ShoppingCart } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, AlertCircle, ShoppingCart, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { LanguageCode } from '../../types';
 import { translations } from '../../utils/translations';
+import { api } from '../../services/api';
 
 interface LowStockModalProps {
   isOpen: boolean;
@@ -12,14 +13,30 @@ interface LowStockModalProps {
 
 export const LowStockModal: React.FC<LowStockModalProps> = ({ isOpen, onClose, language }) => {
   const t = translations[language];
+  const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchLowStockItems();
+    }
+  }, [isOpen]);
+
+  const fetchLowStockItems = async () => {
+    setIsLoading(true);
+    try {
+      const items = await api.inventory.getAll();
+      // Filter items where quantity is at or below reorder level
+      const lowStock = items.filter((item: any) => item.quantity <= item.reorderLevel);
+      setLowStockItems(lowStock);
+    } catch (e) {
+      console.error('Failed to fetch inventory:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
-
-  const lowStockItems = [
-    { id: 1, name: 'Yirgacheffe Grade 2', sku: 'CF-YIR-G2', current: 45, alert: 50, unit: 'kg' },
-    { id: 2, name: 'Packaging Bags (500g)', sku: 'PKG-500G', current: 120, alert: 200, unit: 'pcs' },
-    { id: 3, name: 'Printer Paper (A4)', sku: 'OFF-A4', current: 2, alert: 5, unit: 'reams' },
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -42,25 +59,36 @@ export const LowStockModal: React.FC<LowStockModalProps> = ({ isOpen, onClose, l
         </div>
 
         {/* Body */}
-        <div className="p-4">
-            <div className="space-y-3">
-                {lowStockItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-dark-900/50">
-                        <div className="flex-1">
-                            <h4 className="font-semibold text-slate-900 dark:text-white">{item.name}</h4>
-                            <p className="text-xs text-slate-500 font-mono">{item.sku}</p>
-                        </div>
-                        <div className="text-right mx-4">
-                            <div className="font-bold text-red-600">{item.current} <span className="text-xs font-normal text-slate-500">{item.unit}</span></div>
-                            <div className="text-[10px] text-slate-400">Target: {item.alert} {item.unit}</div>
-                        </div>
-                        <Button size="sm" variant="outline" className="text-xs h-8">
-                            <ShoppingCart size={14} className="mr-1" />
-                            {t.reorder}
-                        </Button>
-                    </div>
-                ))}
-            </div>
+        <div className="p-4 max-h-[60vh] overflow-y-auto">
+            {isLoading ? (
+              <div className="py-8 text-center">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-500 mb-2" />
+                <p className="text-sm text-slate-500">Loading inventory...</p>
+              </div>
+            ) : lowStockItems.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-slate-500">All items are well stocked!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                  {lowStockItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-dark-900/50">
+                          <div className="flex-1">
+                              <h4 className="font-semibold text-slate-900 dark:text-white">{item.name}</h4>
+                              <p className="text-xs text-slate-500 font-mono">{item.sku}</p>
+                          </div>
+                          <div className="text-right mx-4">
+                              <div className="font-bold text-red-600">{item.quantity} <span className="text-xs font-normal text-slate-500">{item.unit}</span></div>
+                              <div className="text-[10px] text-slate-400">Reorder at: {item.reorderLevel} {item.unit}</div>
+                          </div>
+                          <Button size="sm" variant="outline" className="text-xs h-8">
+                              <ShoppingCart size={14} className="mr-1" />
+                              {t.reorder}
+                          </Button>
+                      </div>
+                  ))}
+              </div>
+            )}
         </div>
 
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-dark-900 text-center">

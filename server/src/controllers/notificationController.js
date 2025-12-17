@@ -3,6 +3,10 @@ const prisma = new PrismaClient();
 
 exports.getNotifications = async (req, res) => {
   try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    
     // Auto-generate some mock notifications if empty for demo purposes
     const count = await prisma.notification.count({ where: { userId: req.user.userId } });
     
@@ -37,12 +41,17 @@ exports.getNotifications = async (req, res) => {
 
 exports.markRead = async (req, res) => {
   try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    
     await prisma.notification.updateMany({
         where: { userId: req.user.userId, read: false },
         data: { read: true }
     });
     res.json({ success: true });
   } catch (error) {
+    console.error('Error marking notifications as read:', error);
     res.status(500).json({ message: 'Error updating notifications' });
   }
 };

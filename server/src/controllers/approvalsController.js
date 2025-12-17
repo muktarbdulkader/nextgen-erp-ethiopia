@@ -55,10 +55,10 @@ exports.getPendingApprovals = async (req, res) => {
         take: 50
       })),
       
-      // Sales Orders
+      // Sales Orders (pending or processing)
       safeQuery(() => prisma.order.findMany({
         where: { 
-          status: 'pending'
+          status: { in: ['pending', 'Pending', 'processing', 'Processing'] }
         },
         orderBy: { createdAt: 'desc' },
         take: 50
@@ -244,11 +244,82 @@ exports.approveItem = async (req, res) => {
         break;
 
       case 'order':
-        await prisma.order.update({
+        // Get order with items
+        const order = await prisma.order.findUnique({
           where: { id },
-          data: { status: 'confirmed' }
+          include: { items: true }
         });
-        result = { message: 'Order confirmed' };
+        
+        if (!order) return res.status(404).json({ message: 'Order not found' });
+        
+        await prisma.$transaction(async (tx) => {
+          // Step 1: Deduct inventory for each item
+          for (const orderItem of order.items) {
+            const inventoryItem = await tx.inventoryItem.findUnique({
+              where: { id: orderItem.itemId }
+            });
+            
+            if (!inventoryItem) {
+              throw new Error(`Inventory item not found: ${orderItem.itemId}`);
+            }
+            
+            if (inventoryItem.quantity < orderItem.quantity) {
+              throw new Error(`Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.quantity}, Requested: ${orderItem.quantity}`);
+            }
+            
+            // Deduct stock
+            await tx.inventoryItem.update({
+              where: { id: orderItem.itemId },
+              data: { quantity: { decrement: orderItem.quantity } }
+            });
+          }
+          
+          // Step 2: Record financial transaction
+          let salesAccount = await tx.account.findFirst({
+            where: { 
+              name: 'Sales Revenue', 
+              type: 'revenue',
+              companyName
+            }
+          });
+          
+          if (!salesAccount) {
+            salesAccount = await tx.account.create({
+              data: {
+                name: 'Sales Revenue',
+                type: 'revenue',
+                balance: 0,
+                companyName
+              }
+            });
+          }
+          
+          // Update account balance
+          await tx.account.update({
+            where: { id: salesAccount.id },
+            data: { balance: { increment: order.totalAmount } }
+          });
+          
+          // Create transaction record
+          await tx.transaction.create({
+            data: {
+              description: `Sale Order ${order.orderNumber} - ${order.customerName}`,
+              amount: order.totalAmount,
+              type: 'income',
+              category: 'Sales',
+              accountId: salesAccount.id,
+              createdBy: userId
+            }
+          });
+          
+          // Step 3: Update order status to Completed
+          await tx.order.update({
+            where: { id },
+            data: { status: 'Completed' }
+          });
+        });
+        
+        result = { message: 'Order approved - inventory deducted and sale recorded' };
         break;
 
       case 'procurement':
@@ -314,7 +385,7 @@ exports.rejectItem = async (req, res) => {
       case 'order':
         await prisma.order.update({
           where: { id },
-          data: { status: 'cancelled' }
+          data: { status: 'Cancelled' }
         });
         result = { message: 'Order cancelled' };
         break;

@@ -81,14 +81,12 @@ exports.getStats = async (req, res) => {
         }
       }),
 
-      // Get active clients count from partners (handle if Partner model doesn't exist)
-      prisma.partner?.count({
-        where: {
-          userId,
-          type: 'customer',
-          status: 'approved'
-        }
-      }).catch(() => 0) || Promise.resolve(0),
+      // Get unique clients from orders
+      prisma.order.findMany({
+        where: { createdById: userId },
+        select: { customerName: true },
+        distinct: ['customerName']
+      }),
 
       // EMPLOYEES IN COMPANY (USER'S COMPANY)
       prisma.employee.count({
@@ -169,7 +167,7 @@ exports.getStats = async (req, res) => {
       
       // HR Stats
       totalEmployees,
-      activeClients,
+      activeClients: activeClients.length,
       
       // Recent Activity
       recentTransactions: recentTransactions.map(t => ({

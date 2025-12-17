@@ -3,12 +3,17 @@ const prisma = new PrismaClient();
 
 exports.getItems = async (req, res) => {
   try {
+    if (!req.user || !req.user.companyName) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    
     const items = await prisma.inventoryItem.findMany({
       where: { companyName: req.user.companyName },
       orderBy: { name: 'asc' }
     });
     res.json(items);
   } catch (error) {
+    console.error('Error fetching inventory:', error);
     res.status(500).json({ message: 'Error fetching inventory' });
   }
 };

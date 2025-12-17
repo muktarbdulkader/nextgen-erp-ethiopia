@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, LanguageCode } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Camera, Save, User as UserIcon, Building2, Mail, CheckCircle, Upload, CreditCard, Download } from 'lucide-react';
+import { Camera, Save, User as UserIcon, Building2, Mail, CheckCircle, Upload, CreditCard, Download, Loader2 } from 'lucide-react';
 import { translations } from '../../utils/translations';
+import { api } from '../../services/api';
 
 interface SettingsModuleProps {
     user: User | null;
@@ -19,11 +20,39 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ user, onUpdateUs
     const [isLoading, setIsLoading] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Billing data state
+    const [billingLoading, setBillingLoading] = useState(false);
+    const [subscription, setSubscription] = useState<any>(null);
+    const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
     // Update active tab when prop changes
     useEffect(() => {
         setActiveTab(initialTab);
     }, [initialTab]);
+    
+    // Fetch billing data when billing tab is active
+    useEffect(() => {
+        if (activeTab === 'billing') {
+            fetchBillingData();
+        }
+    }, [activeTab]);
+    
+    const fetchBillingData = async () => {
+        setBillingLoading(true);
+        try {
+            const [subData, historyData] = await Promise.all([
+                api.payment.getSubscription(),
+                api.payment.getHistory()
+            ]);
+            setSubscription(subData);
+            setPaymentHistory(historyData);
+        } catch (error) {
+            console.error('Failed to fetch billing data:', error);
+        } finally {
+            setBillingLoading(false);
+        }
+    };
 
     const [formData, setFormData] = useState<User>({
         firstName: user?.firstName || '',
@@ -198,6 +227,10 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ user, onUpdateUs
 
                     </form>
                 </div>
+            ) : billingLoading ? (
+                <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+                </div>
             ) : (
                 <div className="space-y-6">
                     {/* Billing Content */}
@@ -207,21 +240,35 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ user, onUpdateUs
                         <div className="flex justify-between items-start">
                              <div>
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{t.currentPlan || 'Current Plan'}</h3>
-                                <p className="text-slate-500 text-sm">{user?.plan || 'Starter'} Plan</p>
+                                <p className="text-slate-500 text-sm">{subscription?.plan || user?.plan || 'Starter'} Plan</p>
                              </div>
-                             <div className="bg-brand-100 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 px-3 py-1 rounded-full text-xs font-bold uppercase">
-                                Active
+                             <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                                subscription?.status === 'active' 
+                                    ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+                                    : 'bg-brand-100 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300'
+                             }`}>
+                                {subscription?.status || 'Active'}
                              </div>
                         </div>
                         <div className="mt-6">
                              <div className="text-3xl font-bold text-slate-900 dark:text-white">
-                                {user?.plan === 'Growth' ? '2,500 ETB' : '0 ETB'} 
+                                {(subscription?.plan || user?.plan) === 'Growth' ? '2,500 ETB' : 
+                                 (subscription?.plan || user?.plan) === 'Enterprise' ? '7,500 ETB' : '0 ETB'} 
                                 <span className="text-sm font-normal text-slate-500"> / month</span>
                              </div>
-                             <p className="text-xs text-slate-500 mt-2">Next billing date: Nov 01, 2024</p>
+                             <p className="text-xs text-slate-500 mt-2">
+                                Next billing date: {subscription?.nextBillingDate 
+                                    ? new Date(subscription.nextBillingDate).toLocaleDateString() 
+                                    : 'N/A'}
+                             </p>
+                             {subscription?.memberSince && (
+                                <p className="text-xs text-slate-400 mt-1">
+                                    Member since: {new Date(subscription.memberSince).toLocaleDateString()}
+                                </p>
+                             )}
                         </div>
                         
-                        {user?.plan !== 'Growth' && user?.plan !== 'Enterprise' && (
+                        {(subscription?.plan || user?.plan) !== 'Growth' && (subscription?.plan || user?.plan) !== 'Enterprise' && (
                              <div className="mt-6 border-t border-slate-100 dark:border-slate-700 pt-4">
                                 <Button onClick={onUpgrade} className="w-full sm:w-auto">
                                     {t.upgradePlan || 'Upgrade Plan'}
@@ -238,55 +285,59 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ user, onUpdateUs
                                 <CreditCard size={24} />
                             </div>
                             <div className="flex-1">
-                                <p className="text-sm font-medium text-slate-900 dark:text-white">Telebirr •••• 9876</p>
-                                <p className="text-xs text-slate-500">Expires 12/25</p>
+                                <p className="text-sm font-medium text-slate-900 dark:text-white">Chapa Payment</p>
+                                <p className="text-xs text-slate-500">Telebirr, CBE Birr, Cards</p>
                             </div>
-                            <span className="text-xs bg-slate-200 dark:bg-dark-700 px-2 py-1 rounded">Default</span>
+                            <span className="text-xs bg-green-100 dark:bg-green-900/20 text-green-700 px-2 py-1 rounded">Connected</span>
                         </div>
-                         <button className="text-sm text-brand-600 hover:text-brand-700 font-medium mt-3">
-                            + Add Payment Method
-                         </button>
                      </div>
 
                     {/* Billing History */}
                     <div className="bg-white dark:bg-dark-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-                             <h3 className="font-bold text-slate-900 dark:text-white">{t.billingHistory || 'Billing History'}</h3>
+                             <h3 className="font-bold text-slate-900 dark:text-white">{t.billingHistory || 'Payment History'}</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-slate-50 dark:bg-dark-900 text-slate-500 dark:text-slate-400">
                                     <tr>
                                         <th className="px-6 py-3">{t.date || 'Date'}</th>
-                                        <th className="px-6 py-3">{t.description || 'Description'}</th>
+                                        <th className="px-6 py-3">Reference</th>
                                         <th className="px-6 py-3">{t.amount || 'Amount'}</th>
                                         <th className="px-6 py-3">{t.status || 'Status'}</th>
-                                        <th className="px-6 py-3"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                    <tr>
-                                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300">Oct 01, 2024</td>
-                                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300">Subscription - Starter</td>
-                                        <td className="px-6 py-4 font-medium">0.00 ETB</td>
-                                        <td className="px-6 py-4"><span className="text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full text-xs">Paid</span></td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button className="text-brand-600 hover:underline flex items-center gap-1 justify-end ml-auto">
-                                                <Download size={14} /> PDF
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300">Sep 01, 2024</td>
-                                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300">Subscription - Starter</td>
-                                        <td className="px-6 py-4 font-medium">0.00 ETB</td>
-                                        <td className="px-6 py-4"><span className="text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full text-xs">Paid</span></td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button className="text-brand-600 hover:underline flex items-center gap-1 justify-end ml-auto">
-                                                <Download size={14} /> PDF
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    {paymentHistory.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                                                No payment history yet
+                                            </td>
+                                        </tr>
+                                    ) : paymentHistory.map((payment) => (
+                                        <tr key={payment.id}>
+                                            <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
+                                                {new Date(payment.createdAt).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-500 font-mono text-xs">
+                                                {payment.txRef}
+                                            </td>
+                                            <td className="px-6 py-4 font-medium">
+                                                {payment.amount?.toLocaleString()} {payment.currency || 'ETB'}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                                    payment.status === 'success' 
+                                                        ? 'text-green-600 bg-green-50 dark:bg-green-900/20'
+                                                        : payment.status === 'pending'
+                                                        ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/20'
+                                                        : 'text-red-600 bg-red-50 dark:bg-red-900/20'
+                                                }`}>
+                                                    {payment.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>

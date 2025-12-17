@@ -92,7 +92,10 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ language, onRefresh })
       </div>
   );
 
-  const totalSalesValue = orders.reduce((acc, curr) => acc + curr.total, 0);
+  const totalSalesValue = orders.reduce((acc, curr) => acc + (curr.totalAmount || curr.total || 0), 0);
+  
+  // Get unique clients from orders
+  const uniqueClients = new Set(orders.map(o => o.customerName || o.client)).size;
 
   return (
     <div className="space-y-6 animate-fade-in pb-20">
@@ -114,9 +117,9 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ language, onRefresh })
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard icon={ShoppingCart} title={t.totalSales} value={`${totalSalesValue.toLocaleString()} ETB`} change="+15% this month" />
-          <StatCard icon={Users} title={t.activeClients} value="124" change="+4 new this week" />
-          <StatCard icon={Package} title="Orders Count" value={orders.length} change={`+${orders.filter(o => o.status === 'Processing').length} pending`} />
+          <StatCard icon={ShoppingCart} title={t.totalSales} value={`${totalSalesValue.toLocaleString()} ETB`} change={`${orders.filter(o => o.status === 'Completed').length} completed`} />
+          <StatCard icon={Users} title={t.activeClients} value={uniqueClients} change={`From ${orders.length} orders`} />
+          <StatCard icon={Package} title="Orders Count" value={orders.length} change={`${orders.filter(o => o.status === 'Processing').length} pending`} />
       </div>
 
       <div className="bg-white dark:bg-dark-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -146,12 +149,12 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ language, onRefresh })
                             <td className="px-6 py-4 font-mono font-medium text-slate-900 dark:text-white">
                                 {order.id.split('-')[0]}...
                             </td>
-                            <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">{order.client}</td>
+                            <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">{order.customerName || order.client}</td>
                             <td className="px-6 py-4 text-slate-500">
                                 {order.items?.length || 0} items
                             </td>
                             <td className="px-6 py-4 text-slate-500 flex items-center gap-1">
-                                <Calendar size={12} /> {new Date(order.date).toLocaleDateString()}
+                                <Calendar size={12} /> {new Date(order.createdAt || order.date).toLocaleDateString()}
                             </td>
                             <td className="px-6 py-4">
                                 <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
@@ -163,7 +166,7 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ language, onRefresh })
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">
-                                {order.total.toLocaleString()} ETB
+                                {(order.totalAmount || order.total || 0).toLocaleString()} ETB
                             </td>
                             <td className="px-6 py-4 text-right">
                                 <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">

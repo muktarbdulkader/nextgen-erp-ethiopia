@@ -221,7 +221,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick, user, language, s
                <div className="p-1">
                   <button 
                     onClick={() => {
-                        onNavigate('settings');
+                        onNavigate('account');
                         setShowProfileMenu(false);
                     }}
                     className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-dark-700 rounded-lg transition-colors"

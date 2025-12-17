@@ -396,3 +396,65 @@ exports.getChapaConfig = async (req, res) => {
     res.status(500).json({ message: 'Failed to get Chapa config' });
   }
 };
+
+
+/* ============================
+   GET PAYMENT HISTORY
+============================ */
+
+exports.getPaymentHistory = async (req, res) => {
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const payments = await prisma.payment.findMany({
+      where: { userId: req.user.userId },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+
+    res.json(payments);
+  } catch (error) {
+    console.error('Get Payment History Error:', error);
+    res.status(500).json({ message: 'Failed to fetch payment history' });
+  }
+};
+
+/* ============================
+   GET USER SUBSCRIPTION
+============================ */
+
+exports.getSubscription = async (req, res) => {
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        plan: true,
+        planExpiresAt: true,
+        createdAt: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Calculate next billing date (1 month from now or plan expiry)
+    const nextBillingDate = user.planExpiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    res.json({
+      plan: user.plan || 'Starter',
+      status: 'active',
+      nextBillingDate,
+      memberSince: user.createdAt
+    });
+  } catch (error) {
+    console.error('Get Subscription Error:', error);
+    res.status(500).json({ message: 'Failed to fetch subscription' });
+  }
+};

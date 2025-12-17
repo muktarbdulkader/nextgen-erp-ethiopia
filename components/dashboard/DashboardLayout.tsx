@@ -235,7 +235,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
     <div className="flex h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-slate-100 font-sans overflow-hidden">
       <Sidebar 
         key={sidebarRefreshKey}
-        currentModule={activeModule === 'billing' ? 'settings' : activeModule} 
+        currentModule={activeModule === 'billing' || activeModule === 'account' ? 'settings' : activeModule} 
         setModule={handleSetModule} 
         onLogout={handleLogout} 
         language={language}
@@ -440,6 +440,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
             {activeModule === 'payroll' && <PayrollModule key={`payroll-${refreshKey}`} language={language} />}
             {activeModule === 'approvals' && <ApprovalsModule key={`approvals-${refreshKey}`} language={language} onRefresh={refreshDashboard} />}
             {activeModule === 'settings' && <SettingsPage onModulesUpdated={() => setSidebarRefreshKey(prev => prev + 1)} />}
+            {activeModule === 'account' && <SettingsModule user={user} onUpdateUser={onUpdateUser} language={language} initialTab="profile" onUpgrade={handleUpgrade} />}
             {activeModule === 'billing' && <SettingsModule user={user} onUpdateUser={onUpdateUser} language={language} initialTab="billing" onUpgrade={handleUpgrade} />}
             {activeModule === 'docs' && <Documentation />}
             
@@ -449,7 +450,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
                 </div>
             )}
 
-            {(activeModule !== 'overview' && activeModule !== 'docs' && activeModule !== 'tasks' && activeModule !== 'finance' && activeModule !== 'settings' && activeModule !== 'billing' && activeModule !== 'inventory' && activeModule !== 'hr' && activeModule !== 'sales' && activeModule !== 'ai-chat') && (
+            {(activeModule !== 'overview' && activeModule !== 'docs' && activeModule !== 'tasks' && activeModule !== 'finance' && activeModule !== 'settings' && activeModule !== 'account' && activeModule !== 'billing' && activeModule !== 'inventory' && activeModule !== 'hr' && activeModule !== 'sales' && activeModule !== 'ai-chat') && (
                 <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-fade-in">
                 <div className="w-16 h-16 bg-slate-100 dark:bg-dark-800 rounded-full flex items-center justify-center mb-4 text-slate-400 animate-pulse-slow">
                     <Settings size={32} />

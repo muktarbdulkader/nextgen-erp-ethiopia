@@ -244,5 +244,7 @@ router.post('/notifications/read', notificationController.markRead);
 router.get('/payments/config', paymentController.getChapaConfig);
 router.post('/payments/initialize', paymentController.initializePayment);
 router.get('/payments/verify/:tx_ref', paymentController.verifyPayment);
+router.get('/payments/history', paymentController.getPaymentHistory);
+router.get('/payments/subscription', paymentController.getSubscription);
 
 module.exports = router;
