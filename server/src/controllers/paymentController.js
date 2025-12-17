@@ -17,7 +17,7 @@ const isTestMode = CHAPA_SECRET_KEY?.includes('TEST') || !CHAPA_SECRET_KEY;
 
 exports.initializePayment = async (req, res) => {
   try {
-    const { amount, email, firstName, lastName, description, category } = req.body;
+    const { amount, email, firstName, lastName, description, category, type = 'order' } = req.body;
     
     if (!req.user || !req.user.userId) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -31,38 +31,41 @@ exports.initializePayment = async (req, res) => {
     // Generate unique transaction reference
     const txRef = `MUKTI-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Find or create "Chapa Payments" account
-    let chapaAccount = await prisma.account.findFirst({
-      where: { 
-        name: 'Chapa Payments',
-        companyName: req.user.companyName
-      }
-    });
-
-    if (!chapaAccount) {
-      chapaAccount = await prisma.account.create({
-        data: {
+    // For subscription payments, don't create transaction record
+    if (type !== 'subscription' && type !== 'upgrade') {
+      // Find or create "Chapa Payments" account
+      let chapaAccount = await prisma.account.findFirst({
+        where: { 
           name: 'Chapa Payments',
-          type: 'Revenue',
-          balance: 0,
           companyName: req.user.companyName
         }
       });
-    }
 
-    // Create a pending transaction record
-    const transaction = await prisma.transaction.create({
-      data: {
-        description: description || 'Chapa Payment',
-        amount: parseFloat(amount),
-        type: 'income',
-        category: category || 'Sales',
-        date: new Date(),
-        reference: txRef,
-        accountId: chapaAccount.id,
-        createdBy: req.user.userId
+      if (!chapaAccount) {
+        chapaAccount = await prisma.account.create({
+          data: {
+            name: 'Chapa Payments',
+            type: 'Revenue',
+            balance: 0,
+            companyName: req.user.companyName
+          }
+        });
       }
-    });
+
+      // Create a pending transaction record
+      const transaction = await prisma.transaction.create({
+        data: {
+          description: description || 'Chapa Payment',
+          amount: parseFloat(amount),
+          type: 'income',
+          category: category || 'Sales',
+          date: new Date(),
+          reference: txRef,
+          accountId: chapaAccount.id,
+          createdBy: req.user.userId
+        }
+      });
+    }
 
     // Create payment record
     await prisma.payment.create({
@@ -73,10 +76,11 @@ exports.initializePayment = async (req, res) => {
         txRef: txRef,
         status: 'pending',
         paymentMethod: 'Chapa',
+        type: type,
         metadata: {
           description,
           category,
-          transactionId: transaction.id
+          type
         }
       }
     });
@@ -87,8 +91,25 @@ exports.initializePayment = async (req, res) => {
         console.log('🔄 Initializing Chapa payment...');
         console.log('Secret Key (first 20 chars):', CHAPA_SECRET_KEY?.substring(0, 20) + '...');
         
-        // Ensure valid values - Chapa requires these fields
-        const customerEmail = (email || req.user.email || 'customer@example.com').trim();
+        // Get user email from database for authenticated users
+        let customerEmail = email;
+        if (!customerEmail && req.user && req.user.userId) {
+          const user = await prisma.user.findUnique({
+            where: { id: req.user.userId },
+            select: { email: true, firstName: true, lastName: true }
+          });
+          if (user) {
+            customerEmail = user.email;
+            if (!firstName) firstName = user.firstName;
+            if (!lastName) lastName = user.lastName;
+          }
+        }
+        
+        // Fallback if still no email
+        if (!customerEmail) {
+          return res.status(400).json({ message: 'Email is required for payment' });
+        }
+        
         const customerFirstName = (firstName || 'Customer').trim() || 'Customer';
         const customerLastName = (lastName || 'User').trim() || 'User';
         const paymentAmount = parseFloat(amount);
@@ -96,7 +117,8 @@ exports.initializePayment = async (req, res) => {
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(customerEmail)) {
-          return res.status(400).json({ message: 'Invalid email format' });
+          console.error('Invalid email format:', customerEmail);
+          return res.status(400).json({ message: 'Invalid email format: ' + customerEmail });
         }
         
         const requestBody = {

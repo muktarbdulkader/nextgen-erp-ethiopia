@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Database, Building2, Users, Bell, Plug, BookOpen } from 'lucide-react';
+import { Settings as SettingsIcon, Database, Building2, Users, Bell, Plug, BookOpen, CreditCard } from 'lucide-react';
 import { OrganizationSettings } from './settings/OrganizationSettings';
 import { UsersSettings } from './settings/UsersSettings';
 import { NotificationsSettings } from './settings/NotificationsSettings';
 import { IntegrationsSettings } from './settings/IntegrationsSettings';
 import { KnowledgeSettings } from './settings/KnowledgeSettings';
 import { ModulesSettings } from './settings/ModulesSettings';
+import { BillingPage } from './BillingPage';
 
-type TabType = 'modules' | 'organization' | 'users' | 'notifications' | 'integrations' | 'knowledge';
+type TabType = 'modules' | 'organization' | 'users' | 'notifications' | 'integrations' | 'knowledge' | 'billing';
 
 interface SettingsPageProps {
   onModulesUpdated?: () => void;
@@ -22,7 +23,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onModulesUpdated }) 
     { id: 'users' as TabType, label: 'Users & Permissions', icon: Users },
     { id: 'notifications' as TabType, label: 'Notifications', icon: Bell },
     { id: 'integrations' as TabType, label: 'Integrations', icon: Plug },
-    { id: 'knowledge' as TabType, label: 'Knowledge Base', icon: BookOpen }
+    { id: 'knowledge' as TabType, label: 'Knowledge Base', icon: BookOpen },
+    { id: 'billing' as TabType, label: 'Billing', icon: CreditCard }
   ];
 
   return (
@@ -67,6 +69,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onModulesUpdated }) 
         {activeTab === 'notifications' && <NotificationsSettings />}
         {activeTab === 'integrations' && <IntegrationsSettings />}
         {activeTab === 'knowledge' && <KnowledgeSettings />}
+        {activeTab === 'billing' && <BillingPage />}
       </div>
     </div>
   );

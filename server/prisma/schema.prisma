@@ -80,6 +80,7 @@ model User {
   employees     Employee[]      @relation("EmployeeManager")
   managedTasks  Task[]          @relation("TaskManager")
   transactions  Transaction[]
+  subscription  Subscription?
 }
 
 // =============================================
@@ -233,16 +234,84 @@ model Payment {
   amount        Float
   currency      String    @default("ETB")
   txRef         String    @unique
-  status        String    @default("pending")
-  paymentMethod String?
+  status        String    @default("pending")  // pending, success, failed
+  paymentMethod String?   // telebirr, cbe, card
 
   orderId       String?   @db.ObjectId
   order         Order?    @relation(fields: [orderId], references: [id])
+
+  type          String    @default("order")  // order, subscription, upgrade
+  subscriptionId String?  @db.ObjectId
+  subscription  Subscription? @relation(fields: [subscriptionId], references: [id])
 
   metadata      Json?
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+}
+
+// =============================================
+// SUBSCRIPTIONS & BILLING
+// =============================================
+model Subscription {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId        String    @unique @db.ObjectId
+  user          User      @relation(fields: [userId], references: [id])
+
+  plan          String    @default("Starter")  // Starter, Growth, Enterprise
+  status        String    @default("active")   // active, cancelled, expired, pending
+  
+  billingCycle  String    @default("monthly")  // monthly, yearly
+  amount        Float     // Monthly/yearly amount
+  
+  startDate     DateTime  @default(now())
+  renewalDate   DateTime  // Next billing date
+  cancelledAt   DateTime?
+  
+  autoRenew     Boolean   @default(true)
+  paymentMethod String?   // telebirr, cbe, card
+  
+  payments      Payment[]
+  invoices      Invoice[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([renewalDate])
+}
+
+// =============================================
+// INVOICES
+// =============================================
+model Invoice {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+
+  subscriptionId String   @db.ObjectId
+  subscription  Subscription @relation(fields: [subscriptionId], references: [id])
+
+  invoiceNumber String    @unique
+  amount        Float
+  tax           Float     @default(0)
+  total         Float
+  
+  status        String    @default("unpaid")  // unpaid, paid, overdue, cancelled
+  dueDate       DateTime
+  paidDate      DateTime?
+  
+  description   String?
+  notes         String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([dueDate])
 }
 
 // =============================================

@@ -247,4 +247,19 @@ router.get('/payments/verify/:tx_ref', paymentController.verifyPayment);
 router.get('/payments/history', paymentController.getPaymentHistory);
 router.get('/payments/subscription', paymentController.getSubscription);
 
+// ------------------------------------------
+// BILLING & SUBSCRIPTIONS
+// ------------------------------------------
+
+const billingController = require('../controllers/billingController');
+
+router.get('/billing/overview', billingController.getBillingOverview);
+router.post('/billing/upgrade', billingController.upgradePlan);
+router.post('/billing/confirm-upgrade', billingController.confirmUpgrade);
+router.get('/billing/invoices', billingController.getInvoices);
+router.get('/billing/subscription', billingController.getSubscription);
+router.post('/billing/cancel', billingController.cancelSubscription);
+router.put('/billing/payment-method', billingController.updatePaymentMethod);
+router.get('/billing/history', billingController.getBillingHistory);
+
 module.exports = router;

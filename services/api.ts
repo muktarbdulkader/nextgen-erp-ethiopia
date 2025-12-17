@@ -605,5 +605,43 @@ export const api = {
             body: JSON.stringify({ type, reason })
         });
     }
+  },
+
+  billing: {
+    getOverview: async (): Promise<any> => {
+        return await fetchClient<any>('/billing/overview');
+    },
+    upgradePlan: async (newPlan: string, billingCycle: 'monthly' | 'yearly' = 'monthly'): Promise<any> => {
+        return await fetchClient<any>('/billing/upgrade', {
+            method: 'POST',
+            body: JSON.stringify({ newPlan, billingCycle })
+        });
+    },
+    confirmUpgrade: async (newPlan: string, billingCycle: 'monthly' | 'yearly', txRef: string): Promise<any> => {
+        return await fetchClient<any>('/billing/confirm-upgrade', {
+            method: 'POST',
+            body: JSON.stringify({ newPlan, billingCycle, txRef })
+        });
+    },
+    getInvoices: async (): Promise<any> => {
+        return await fetchClient<any>('/billing/invoices');
+    },
+    getSubscription: async (): Promise<any> => {
+        return await fetchClient<any>('/billing/subscription');
+    },
+    cancelSubscription: async (): Promise<any> => {
+        return await fetchClient<any>('/billing/cancel', {
+            method: 'POST'
+        });
+    },
+    updatePaymentMethod: async (paymentMethod: string): Promise<any> => {
+        return await fetchClient<any>('/billing/payment-method', {
+            method: 'PUT',
+            body: JSON.stringify({ paymentMethod })
+        });
+    },
+    getBillingHistory: async (): Promise<any> => {
+        return await fetchClient<any>('/billing/history');
+    }
   }
 };

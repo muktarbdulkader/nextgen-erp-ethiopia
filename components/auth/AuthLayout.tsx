@@ -17,9 +17,9 @@ interface Testimonial {
 
 export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, onBack, title, subtitle }) => {
   const [testimonial, setTestimonial] = useState<Testimonial>({
-    initial: 'DK',
-    name: 'Dawit Kebede',
-    title: 'CEO, Horizon Coffee PLC',
+    initial: 'MA',
+    name: 'muktar abdulakader',
+    title: 'founder of muktAp',
     message: 'muktiAp transformed how we manage our coffee exports. The AI insights alone saved us thousands in inventory costs.'
   });
 

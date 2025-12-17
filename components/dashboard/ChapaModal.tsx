@@ -22,14 +22,17 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
 }) => {
   const [method, setMethod] = useState<PaymentMethod>('telebirr');
   const [isLoading, setIsLoading] = useState(false);
-  const [amount, setAmount] = useState<number>(initialAmount || (mode === 'upgrade' ? 2500 : 0));
+  // Use initialAmount if provided, otherwise default based on mode
+  const [amount, setAmount] = useState<number>(
+    initialAmount > 0 ? initialAmount : (mode === 'upgrade' ? 2500 : 0)
+  );
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
   if (!isOpen) return null;
 
   const isUpgrade = mode === 'upgrade';
-  const title = isUpgrade ? 'Upgrade to Growth Plan' : 'Secure Payment';
+  const title = isUpgrade ? `Upgrade to ${companyName} Plan` : 'Secure Payment';
   const description = isUpgrade ? 'Monthly Subscription' : companyName;
 
   const upgradeFeatures = [
@@ -55,13 +58,32 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
 
       setIsLoading(true);
       try {
-          const [firstName, ...lastNameParts] = customerName.split(' ');
-          const lastName = lastNameParts.join(' ') || 'Customer';
+          // Get user info from localStorage for upgrades
+          let userEmail = customerEmail;
+          let userFirstName = customerName;
+          let userLastName = '';
+          
+          if (isUpgrade) {
+              try {
+                  const userInfo = localStorage.getItem('user_info');
+                  if (userInfo) {
+                      const user = JSON.parse(userInfo);
+                      userEmail = user.email || customerEmail;
+                      userFirstName = user.firstName || 'Customer';
+                      userLastName = user.lastName || 'User';
+                  }
+              } catch (e) {
+                  console.error('Error reading user info:', e);
+              }
+          }
+          
+          const [firstName, ...lastNameParts] = userFirstName.split(' ');
+          const lastName = lastNameParts.join(' ') || userLastName || 'User';
 
           // Initialize transaction
           const response = await api.payment.initialize({
               amount: amount,
-              email: customerEmail || "customer@example.com",
+              email: userEmail,
               first_name: firstName || "Customer",
               last_name: lastName,
               description: isUpgrade ? "Growth Plan Subscription" : `Payment from ${companyName}`,
@@ -84,8 +106,8 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-dark-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-white dark:bg-dark-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up my-8">
         {/* Chapa Header */}
         <div className={`p-4 flex items-center justify-between ${isUpgrade ? 'bg-gradient-to-r from-brand-600 to-accent-500' : 'bg-[#1C8D58]'}`}>
            <div className="flex items-center gap-2">
@@ -95,7 +117,7 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
            <button onClick={onClose} className="text-white/80 hover:text-white"><X size={20} /></button>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto custom-scrollbar">
             <div className="text-center mb-6">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${isUpgrade ? 'bg-accent-100 text-accent-600' : 'bg-green-100 text-green-600'}`}>
                     {isUpgrade ? <Zap size={24} className="fill-current" /> : <Lock size={24} />}
@@ -103,8 +125,10 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h3>
                 <p className="text-sm text-slate-500">{description}</p>
                 {isUpgrade ? (
-                    <div className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
-                        {amount.toLocaleString()}.00 <span className="text-sm font-medium text-slate-400">ETB</span>
+                    <div className="mt-2">
+                        <div className="text-3xl font-bold text-slate-900 dark:text-white">
+                            {amount.toLocaleString()} <span className="text-sm font-medium text-slate-400">ETB</span>
+                        </div>
                         <span className="text-xs font-normal text-slate-400 block mt-1">per month</span>
                     </div>
                 ) : (
