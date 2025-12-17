@@ -15,6 +15,7 @@ import { ProcurementModule } from './ProcurementModule';
 import { SupplyChainModule } from './SupplyChainModule';
 import { ExpensesModule } from './ExpensesModule';
 import { PayrollModule } from './PayrollModule';
+import { ApprovalsModule } from './ApprovalsModule';
 import { InvoiceModal } from './InvoiceModal';
 import { AddEmployeeModal } from './AddEmployeeModal';
 import { LowStockModal } from './LowStockModal';
@@ -59,6 +60,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
 
   // Translations shortcut
   const t = translations[language];
@@ -71,6 +74,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
           ]);
           setEmployees(empData);
           setStats(statsData);
+          
+          // Fetch pending approvals count
+          try {
+              const result = await api.approvals.getPending();
+              setPendingCount(result?.approvals?.length || 0);
+          } catch (e) {
+              console.log('Approvals not available');
+          }
+          
+          // Fetch recent transactions
+          try {
+              const txData = await api.finance.getTransactions();
+              setRecentTransactions(txData.slice(0, 5)); // Get latest 5
+          } catch (e) {
+              console.log('Transactions not available');
+          }
       } catch (err) {
           console.error("Failed to fetch dashboard data", err);
       }
@@ -283,11 +302,42 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <StatCard title={t.totalRevenue} value={stats ? `ETB ${stats.revenue.toLocaleString()}` : "Loading..."} change="+12.5%" isPositive={true} />
                     <StatCard title={t.pendingInvoices} value={stats ? stats.pendingInvoices : "..."} change="Volume" isPositive={false} />
                     <StatCard title={t.activeClients} value={stats ? stats.activeClients : "..."} change="+4" isPositive={true} />
                     <StatCard title={t.inventoryAlerts} value={stats ? `${stats.lowStockCount} Items` : "..."} change="Low Stock" isPositive={false} />
+                    
+                    {/* Pending Approvals Card */}
+                    <div 
+                      onClick={() => setActiveModule('approvals')}
+                      className={`bg-white dark:bg-dark-800 p-6 rounded-xl border shadow-sm animate-fade-in-up cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
+                        pendingCount > 0 
+                          ? 'border-amber-300 dark:border-amber-600 bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-dark-800' 
+                          : 'border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Pending Approvals</h3>
+                        {pendingCount > 0 && (
+                          <span className="flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className={`text-2xl font-bold ${pendingCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
+                          {pendingCount}
+                        </span>
+                        {pendingCount > 0 && (
+                          <span className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <AlertCircle size={14} />
+                            Action Required
+                          </span>
+                        )}
+                      </div>
+                    </div>
                 </div>
 
                 {/* Revenue Graph Section */}
@@ -311,29 +361,39 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
                             <button className={`text-xs text-brand-600 hover:underline ${language === 'AM' ? 'ethiopic-text' : ''}`} onClick={() => setActiveModule('finance')}>{t.viewAll}</button>
                         </div>
                         <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {[
-                            { id: '#INV-1023', client: 'Tomoca Coffee', date: 'Oct 24, 2024', amount: '12,500 ETB', status: t.pending },
-                            { id: '#INV-1022', client: 'Kaldi\'s Coffee', date: 'Oct 23, 2024', amount: '8,400 ETB', status: t.paid },
-                            { id: '#INV-1021', client: 'Jupiter Hotel', date: 'Oct 22, 2024', amount: '45,000 ETB', status: t.paid },
-                            ].map((tx) => (
-                            <div key={tx.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-dark-700/50 transition-colors group">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded bg-slate-100 dark:bg-dark-700 flex items-center justify-center text-xs font-mono text-slate-500 group-hover:bg-brand-100 group-hover:text-brand-600 transition-colors">
-                                        Tx
+                            {recentTransactions.length === 0 ? (
+                              <div className="p-8 text-center text-slate-500 text-sm">
+                                No transactions yet. Add your first transaction in Finance.
+                              </div>
+                            ) : (
+                              recentTransactions.map((tx) => (
+                                <div key={tx.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-dark-700/50 transition-colors group">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded flex items-center justify-center text-xs font-mono transition-colors ${
+                                          tx.type === 'income' 
+                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-600' 
+                                            : 'bg-slate-100 dark:bg-dark-700 text-slate-500 group-hover:bg-brand-100 group-hover:text-brand-600'
+                                        }`}>
+                                            {tx.type === 'income' ? '↓' : '↑'}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-medium text-slate-900 dark:text-white">{tx.description}</div>
+                                            <div className="text-xs text-slate-500">{new Date(tx.date).toLocaleDateString()}</div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div className="text-sm font-medium text-slate-900 dark:text-white">{tx.client}</div>
-                                        <div className="text-xs text-slate-500">{tx.date}</div>
+                                    <div className="text-right">
+                                        <div className={`text-sm font-bold ${tx.type === 'income' ? 'text-green-600' : 'text-slate-900 dark:text-white'}`}>
+                                          {tx.type === 'income' ? '+' : '-'}ETB {tx.amount?.toLocaleString()}
+                                        </div>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${language === 'AM' ? 'ethiopic-text' : ''} ${
+                                          tx.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                        }`}>
+                                          {tx.status === 'paid' ? t.paid : t.pending}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-bold text-slate-900 dark:text-white">{tx.amount}</div>
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${language === 'AM' ? 'ethiopic-text' : ''} ${tx.status === t.paid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                    {tx.status}
-                                    </span>
-                                </div>
-                            </div>
-                            ))}
+                              ))
+                            )}
                         </div>
                     </div>
                     </div>
@@ -378,6 +438,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
             {activeModule === 'supply-chain' && <SupplyChainModule key={`supply-chain-${refreshKey}`} language={language} />}
             {activeModule === 'expenses' && <ExpensesModule key={`expenses-${refreshKey}`} language={language} />}
             {activeModule === 'payroll' && <PayrollModule key={`payroll-${refreshKey}`} language={language} />}
+            {activeModule === 'approvals' && <ApprovalsModule key={`approvals-${refreshKey}`} language={language} onRefresh={refreshDashboard} />}
             {activeModule === 'settings' && <SettingsPage onModulesUpdated={() => setSidebarRefreshKey(prev => prev + 1)} />}
             {activeModule === 'billing' && <SettingsModule user={user} onUpdateUser={onUpdateUser} language={language} initialTab="billing" onUpgrade={handleUpgrade} />}
             {activeModule === 'docs' && <Documentation />}

@@ -42,6 +42,8 @@ model Transaction {
   date          DateTime   @default(now())
   category      String
   reference     String?
+  status        String     @default("paid")  // paid, pending, rejected
+  paymentMethod String?
 
   accountId     String     @db.ObjectId
   account       Account    @relation(fields: [accountId], references: [id])

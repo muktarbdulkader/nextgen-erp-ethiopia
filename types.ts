@@ -32,7 +32,7 @@ export interface Feature {
   icon: React.ReactNode;
 }
 
-export type ModuleType = 'overview' | 'finance' | 'inventory' | 'sales' | 'hr' | 'tasks' | 'ai-chat' | 'docs' | 'settings' | 'billing' | 'crm' | 'marketing' | 'procurement' | 'supply-chain' | 'expenses' | 'payroll';
+export type ModuleType = 'overview' | 'finance' | 'inventory' | 'sales' | 'hr' | 'tasks' | 'ai-chat' | 'docs' | 'settings' | 'billing' | 'crm' | 'marketing' | 'procurement' | 'supply-chain' | 'expenses' | 'payroll' | 'approvals';
 
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';

@@ -25,6 +25,7 @@ const notificationSettingsController = require('../controllers/notificationSetti
 const integrationController = require('../controllers/integrationController');
 const teamMemberController = require('../controllers/teamMemberController');
 const knowledgeController = require('../controllers/knowledgeController');
+const approvalsController = require('../controllers/approvalsController');
 const authenticateToken = require('../middleware/auth');
 const { checkPermission, isAdmin } = require('../middleware/checkPermission');
 
@@ -130,6 +131,14 @@ router.get('/knowledge/categories', knowledgeController.getCategories);
 router.get('/knowledge/stats', knowledgeController.getStats);
 
 // ------------------------------------------
+// APPROVALS (Admin)
+// ------------------------------------------
+
+router.get('/approvals/pending', approvalsController.getPendingApprovals);
+router.post('/approvals/:id/approve', approvalsController.approveItem);
+router.post('/approvals/:id/reject', approvalsController.rejectItem);
+
+// ------------------------------------------
 // CRM
 // ------------------------------------------
 
@@ -190,6 +199,8 @@ router.delete('/employees/:id', employeeController.deleteEmployee);
 
 router.get('/finance/transactions', financeController.getTransactions);
 router.post('/finance/transactions', financeController.createTransaction);
+router.put('/finance/transactions/:id', financeController.updateTransaction);
+router.delete('/finance/transactions/:id', financeController.deleteTransaction);
 
 // ACCOUNTS
 router.get('/finance/accounts', accountController.getAccounts);

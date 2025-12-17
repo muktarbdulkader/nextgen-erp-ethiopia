@@ -265,6 +265,17 @@ export const api = {
             body: JSON.stringify(tx)
         });
     },
+    updateTransaction: async (id: string, data: Partial<Transaction>): Promise<Transaction> => {
+        return await fetchClient<Transaction>(`/finance/transactions/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    deleteTransaction: async (id: string): Promise<void> => {
+        return await fetchClient<void>(`/finance/transactions/${id}`, {
+            method: 'DELETE'
+        });
+    },
     getAccounts: async (): Promise<any[]> => {
         return await fetchClient<any[]>('/finance/accounts');
     },
@@ -569,6 +580,24 @@ export const api = {
     },
     getStats: async (): Promise<any> => {
         return await fetchClient<any>('/marketing/stats');
+    }
+  },
+
+  approvals: {
+    getPending: async (): Promise<{ approvals: any[]; summary: any }> => {
+        return await fetchClient<{ approvals: any[]; summary: any }>('/approvals/pending');
+    },
+    approve: async (id: string, type: string): Promise<any> => {
+        return await fetchClient<any>(`/approvals/${id}/approve`, {
+            method: 'POST',
+            body: JSON.stringify({ type })
+        });
+    },
+    reject: async (id: string, type: string, reason?: string): Promise<any> => {
+        return await fetchClient<any>(`/approvals/${id}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ type, reason })
+        });
     }
   }
 };

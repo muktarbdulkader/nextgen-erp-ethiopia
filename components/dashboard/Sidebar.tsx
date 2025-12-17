@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Wallet, Package, Users, ShoppingCart, Settings, LogOut, BookOpen, CheckSquare, X, Sparkles, UserCheck, Mail, Truck, BarChart3, Briefcase, Building2 } from 'lucide-react';
+import { LayoutDashboard, Wallet, Package, Users, ShoppingCart, Settings, LogOut, BookOpen, CheckSquare, X, Sparkles, UserCheck, Mail, Truck, BarChart3, Briefcase, Building2, ClipboardCheck } from 'lucide-react';
 import { ModuleType, LanguageCode } from '../../types';
 import { translations } from '../../utils/translations';
 import { api } from '../../services/api';
@@ -18,6 +18,7 @@ const MODULE_PERMISSIONS: Record<string, string[]> = {
   'overview': [],
   'ai-chat': [],
   'tasks': [],
+  'approvals': ['Approve Requests', 'Full Access'],
   'crm': ['View Data', 'Edit Data', 'Full Access'],
   'sales': ['View Data', 'Create Records', 'Full Access'],
   'marketing': ['View Reports', 'Edit Data', 'Full Access'],
@@ -66,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentModule, setModule, onLo
   const allModules = [
     { id: 'overview', label: t.dashboard, icon: LayoutDashboard, category: 'core' },
     { id: 'ai-chat', label: 'AI Assistant', icon: Sparkles, category: 'core' },
+    { id: 'approvals', label: 'Approvals', icon: ClipboardCheck, category: 'core' },
     { id: 'crm', label: 'CRM', icon: UserCheck, category: 'sales', moduleId: 'crm' },
     { id: 'sales', label: t.sales, icon: ShoppingCart, category: 'sales', moduleId: 'sales' },
     { id: 'marketing', label: 'Marketing', icon: Mail, category: 'sales', moduleId: 'marketing' },
@@ -112,85 +114,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentModule, setModule, onLo
   const MenuItem = ({ item, index }: { item: typeof allModules[0]; index: number }) => {
     const Icon = item.icon;
     const isActive = currentModule === item.id;
-    const isHovered = hoveredItem === item.id;
 
     return (
-      <motion.button
-        custom={index}
-        variants={itemVariants}
-        initial="hidden"
-        animate="visible"
+      <button
         onClick={() => { setModule(item.id as ModuleType); onClose(); }}
-        onMouseEnter={() => setHoveredItem(item.id)}
-        onMouseLeave={() => setHoveredItem(null)}
-        className={`group w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 relative overflow-hidden ${
+        className={`group w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 relative ${
           isActive 
-            ? 'text-white' 
-            : 'text-slate-400 hover:text-slate-100'
+            ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-500/20' 
+            : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
         } ${language === 'AM' ? 'ethiopic-text' : ''}`}
-        whileHover={{ x: 4 }}
-        whileTap={{ scale: 0.98 }}
       >
-        {/* Active background */}
-        <AnimatePresence>
-          {isActive && (
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-brand-600 to-brand-500 rounded-xl"
-              layoutId="activeBackground"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* Hover background */}
-        {!isActive && isHovered && (
-          <motion.div
-            className="absolute inset-0 bg-slate-800/50 rounded-xl"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          />
+        {/* Active indicator */}
+        {isActive && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
         )}
 
-        {/* Active indicator */}
-        <AnimatePresence>
-          {isActive && (
-            <motion.div
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"
-              initial={{ scaleY: 0 }}
-              animate={{ scaleY: 1 }}
-              exit={{ scaleY: 0 }}
-              transition={{ duration: 0.2 }}
-            />
-          )}
-        </AnimatePresence>
-
-        <motion.div
-          className="relative z-10"
-          animate={isActive ? { scale: 1.1 } : { scale: 1 }}
-          transition={{ duration: 0.2 }}
-        >
+        <div className={`transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`}>
           <Icon size={20} className={isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'} />
-        </motion.div>
-        <span className={`relative z-10 font-medium text-sm ${isActive ? 'font-semibold' : ''}`}>
+        </div>
+        <span className={`font-medium text-sm ${isActive ? 'font-semibold' : ''}`}>
           {item.label}
         </span>
 
         {/* AI badge */}
         {item.id === 'ai-chat' && (
-          <motion.span 
-            className="relative z-10 ml-auto flex h-2 w-2"
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+          <span className="ml-auto flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-brand-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
-          </motion.span>
+          </span>
         )}
-      </motion.button>
+
+        {/* Approvals badge */}
+        {item.id === 'approvals' && (
+          <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded-full">
+            !
+          </span>
+        )}
+      </button>
     );
   };
 
@@ -199,14 +159,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentModule, setModule, onLo
     
     return (
       <div className="mb-4">
-        <motion.div 
-          className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
+        <div className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
           {title}
-        </motion.div>
+        </div>
         <div className="space-y-1">
           {items.map((item, idx) => (
             <MenuItem key={item.id} item={item} index={idx} />

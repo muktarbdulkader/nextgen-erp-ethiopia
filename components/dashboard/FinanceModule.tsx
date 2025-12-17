@@ -191,7 +191,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
       category: newTransaction.category || 'General',
       date: newTransaction.date || new Date().toISOString().split('T')[0],
       accountId: accountId,
-      status: 'paid' as const,
+      status: 'pending' as const,
       paymentMethod: newTransaction.paymentMethod as any
     };
 
@@ -248,12 +248,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
   };
 
   const handleDeleteAccount = async (id: string) => {
-      if (!window.confirm("Are you sure you want to delete this account?")) return;
+      const account = accounts.find(a => a.id === id);
+      if (!window.confirm(`Are you sure you want to delete "${account?.name || 'this account'}"?`)) return;
       try {
           await api.finance.deleteAccount(id);
           setAccounts(accounts.filter(a => a.id !== id));
-      } catch (e) {
+      } catch (e: any) {
           console.error("Delete failed", e);
+          alert(e?.message || "Failed to delete account. It may have transactions linked to it.");
       }
   };
 
@@ -274,6 +276,36 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
           PaymentMethod: tx.paymentMethod
       }));
       downloadCSV(exportData, 'muktiAp_Finance_Report');
+  };
+
+  const handleApproveTransaction = async (id: string) => {
+      if (!window.confirm("Mark this transaction as paid? This will update the account balance.")) return;
+      try {
+          const updated = await api.finance.updateTransaction(id, { status: 'paid' });
+          setTransactions(transactions.map(tx => tx.id === id ? updated : tx));
+          // Refresh accounts to show updated balance
+          const accData = await api.finance.getAccounts();
+          setAccounts(accData);
+          if (onRefresh) onRefresh();
+      } catch (e: any) {
+          console.error("Approve failed", e);
+          alert(e?.message || "Failed to approve transaction");
+      }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+      if (!window.confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) return;
+      try {
+          await api.finance.deleteTransaction(id);
+          setTransactions(transactions.filter(tx => tx.id !== id));
+          // Refresh accounts to show updated balance
+          const accData = await api.finance.getAccounts();
+          setAccounts(accData);
+          if (onRefresh) onRefresh();
+      } catch (e: any) {
+          console.error("Delete failed", e);
+          alert(e?.message || "Failed to delete transaction");
+      }
   };
 
   return (
@@ -434,13 +466,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
                     <th className="px-6 py-3 font-medium">{t.date}</th>
                     <th className="px-6 py-3 font-medium">{t.status}</th>
                     <th className="px-6 py-3 font-medium text-right">{t.amount}</th>
+                    <th className="px-6 py-3 font-medium text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {isLoading ? (
-                      <tr><td colSpan={6} className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-500"/></td></tr>
+                      <tr><td colSpan={7} className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-500"/></td></tr>
                   ) : filteredTransactions.length === 0 ? (
-                      <tr><td colSpan={6} className="text-center py-8 text-slate-500">
+                      <tr><td colSpan={7} className="text-center py-8 text-slate-500">
                         {transactions.length === 0 ? 'No transactions recorded yet.' : `No ${statusFilter !== 'all' ? statusFilter : ''} ${typeFilter !== 'all' ? typeFilter : ''} transactions found.`}
                       </td></tr>
                   ) : filteredTransactions.map((tx) => (
@@ -476,6 +509,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
                       <td className={`px-6 py-4 text-right font-bold ${tx.type === 'income' ? 'text-green-600' : 'text-slate-900 dark:text-white'}`}>
                         {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
                       </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {tx.status === 'pending' && (
+                            <button
+                              onClick={() => handleApproveTransaction(tx.id)}
+                              className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                              title="Mark as Paid"
+                            >
+                              <CheckCircle2 size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteTransaction(tx.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            title="Delete Transaction"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -487,55 +540,154 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ language, onRefres
 
       {activeTab === 'accounts' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
-          {accounts.map(acc => (
-            <div key={acc.id} className="bg-white dark:bg-dark-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 relative overflow-hidden group hover:shadow-lg transition-shadow">
-              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                 {acc.type === 'bank' ? <Landmark size={80} /> : acc.type === 'mobile' ? <CreditCard size={80} /> : <Wallet size={80} />}
-              </div>
+          {accounts.map(acc => {
+            // Bank brand configurations
+            const getBankBranding = (name: string) => {
+              const nameLower = name.toLowerCase();
               
-              <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md ${
-                        acc.name.includes('CBE') ? 'bg-[#800080]' : 
-                        acc.name.includes('Awash') ? 'bg-[#f7941d]' : 
-                        acc.name.includes('Telebirr') ? 'bg-[#1ca55d]' : 'bg-slate-500'
-                    }`}>
-                        <Building2 size={24} />
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-lg text-slate-900 dark:text-white">{acc.name}</h3>
-                        <p className="text-sm text-slate-500 capitalize">{acc.type === 'bank' ? t.bankAccount : acc.type === 'mobile' ? t.mobileWallet : t.cashAccount}</p>
-                    </div>
+              // Ethiopian Banks
+              if (nameLower.includes('cbe') || nameLower.includes('commercial bank of ethiopia')) {
+                return { bg: 'bg-gradient-to-br from-[#800080] to-[#4B0082]', text: 'text-white', accent: '#800080', logo: '🏛️', bankName: 'Commercial Bank of Ethiopia' };
+              }
+              if (nameLower.includes('awash')) {
+                return { bg: 'bg-gradient-to-br from-[#f7941d] to-[#e67e00]', text: 'text-white', accent: '#f7941d', logo: '🦁', bankName: 'Awash Bank' };
+              }
+              if (nameLower.includes('dashen')) {
+                return { bg: 'bg-gradient-to-br from-[#003366] to-[#001a33]', text: 'text-white', accent: '#003366', logo: '🏔️', bankName: 'Dashen Bank' };
+              }
+              if (nameLower.includes('abyssinia')) {
+                return { bg: 'bg-gradient-to-br from-[#006633] to-[#004422]', text: 'text-white', accent: '#006633', logo: '🌿', bankName: 'Bank of Abyssinia' };
+              }
+              if (nameLower.includes('wegagen')) {
+                return { bg: 'bg-gradient-to-br from-[#0066cc] to-[#004499]', text: 'text-white', accent: '#0066cc', logo: '🌅', bankName: 'Wegagen Bank' };
+              }
+              if (nameLower.includes('nib')) {
+                return { bg: 'bg-gradient-to-br from-[#cc0000] to-[#990000]', text: 'text-white', accent: '#cc0000', logo: '🐝', bankName: 'Nib Bank' };
+              }
+              if (nameLower.includes('oromia') || nameLower.includes('coop')) {
+                return { bg: 'bg-gradient-to-br from-[#009933] to-[#006622]', text: 'text-white', accent: '#009933', logo: '🌾', bankName: 'Cooperative Bank of Oromia' };
+              }
+              if (nameLower.includes('zemen')) {
+                return { bg: 'bg-gradient-to-br from-[#1a1a2e] to-[#16213e]', text: 'text-white', accent: '#1a1a2e', logo: '⏰', bankName: 'Zemen Bank' };
+              }
+              if (nameLower.includes('bunna')) {
+                return { bg: 'bg-gradient-to-br from-[#8B4513] to-[#654321]', text: 'text-white', accent: '#8B4513', logo: '☕', bankName: 'Bunna Bank' };
+              }
+              if (nameLower.includes('abay')) {
+                return { bg: 'bg-gradient-to-br from-[#0077b6] to-[#005588]', text: 'text-white', accent: '#0077b6', logo: '🌊', bankName: 'Abay Bank' };
+              }
+              if (nameLower.includes('berhan')) {
+                return { bg: 'bg-gradient-to-br from-[#ffd700] to-[#ffb700]', text: 'text-slate-900', accent: '#ffd700', logo: '☀️', bankName: 'Berhan Bank' };
+              }
+              if (nameLower.includes('enat')) {
+                return { bg: 'bg-gradient-to-br from-[#ff69b4] to-[#ff1493]', text: 'text-white', accent: '#ff69b4', logo: '👩', bankName: 'Enat Bank' };
+              }
+              
+              // Mobile Money
+              if (nameLower.includes('telebirr')) {
+                return { bg: 'bg-gradient-to-br from-[#1ca55d] to-[#0d8a47]', text: 'text-white', accent: '#1ca55d', logo: '📱', bankName: 'Telebirr' };
+              }
+              if (nameLower.includes('m-pesa') || nameLower.includes('mpesa')) {
+                return { bg: 'bg-gradient-to-br from-[#4CAF50] to-[#2E7D32]', text: 'text-white', accent: '#4CAF50', logo: '📲', bankName: 'M-Pesa' };
+              }
+              if (nameLower.includes('cbe birr')) {
+                return { bg: 'bg-gradient-to-br from-[#9932CC] to-[#800080]', text: 'text-white', accent: '#9932CC', logo: '💳', bankName: 'CBE Birr' };
+              }
+              if (nameLower.includes('amole')) {
+                return { bg: 'bg-gradient-to-br from-[#FF6B00] to-[#CC5500]', text: 'text-white', accent: '#FF6B00', logo: '🔶', bankName: 'Amole' };
+              }
+              if (nameLower.includes('hellocash')) {
+                return { bg: 'bg-gradient-to-br from-[#00BCD4] to-[#0097A7]', text: 'text-white', accent: '#00BCD4', logo: '👋', bankName: 'HelloCash' };
+              }
+              
+              // International
+              if (nameLower.includes('paypal')) {
+                return { bg: 'bg-gradient-to-br from-[#003087] to-[#001f5c]', text: 'text-white', accent: '#003087', logo: '🅿️', bankName: 'PayPal' };
+              }
+              if (nameLower.includes('stripe')) {
+                return { bg: 'bg-gradient-to-br from-[#635BFF] to-[#4B44CC]', text: 'text-white', accent: '#635BFF', logo: '💳', bankName: 'Stripe' };
+              }
+              if (nameLower.includes('wise') || nameLower.includes('transferwise')) {
+                return { bg: 'bg-gradient-to-br from-[#9FE870] to-[#7BC950]', text: 'text-slate-900', accent: '#9FE870', logo: '🌍', bankName: 'Wise' };
+              }
+              if (nameLower.includes('western union')) {
+                return { bg: 'bg-gradient-to-br from-[#FFDD00] to-[#FFB700]', text: 'text-slate-900', accent: '#FFDD00', logo: '🌐', bankName: 'Western Union' };
+              }
+              if (nameLower.includes('worldremit')) {
+                return { bg: 'bg-gradient-to-br from-[#6B2D5B] to-[#4A1F3F]', text: 'text-white', accent: '#6B2D5B', logo: '🌎', bankName: 'WorldRemit' };
+              }
+              
+              // Default
+              if (acc.type === 'cash') {
+                return { bg: 'bg-gradient-to-br from-slate-600 to-slate-800', text: 'text-white', accent: '#475569', logo: '💵', bankName: 'Cash' };
+              }
+              return { bg: 'bg-gradient-to-br from-slate-500 to-slate-700', text: 'text-white', accent: '#64748b', logo: '🏦', bankName: 'Bank Account' };
+            };
+            
+            const branding = getBankBranding(acc.name);
+            
+            return (
+              <div key={acc.id} className={`${branding.bg} p-6 rounded-2xl relative overflow-hidden group hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]`}>
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/20 -translate-y-1/2 translate-x-1/2" />
+                  <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white/10 translate-y-1/2 -translate-x-1/2" />
+                </div>
+                
+                {/* Card Chip Design */}
+                <div className="absolute top-6 right-6 opacity-30 group-hover:opacity-50 transition-opacity">
+                  <div className="w-12 h-10 rounded-md bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center">
+                    <div className="w-8 h-6 border-2 border-yellow-600/50 rounded-sm" />
                   </div>
-                  
-                  <div className="flex gap-2 relative z-10">
+                </div>
+                
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-8">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-3xl shadow-lg">
+                        {branding.logo}
+                      </div>
+                      <div>
+                        <h3 className={`font-bold text-lg ${branding.text}`}>{acc.name}</h3>
+                        <p className={`text-sm ${branding.text} opacity-80`}>
+                          {acc.type === 'bank' ? '🏛️ Bank Account' : acc.type === 'mobile' ? '📱 Mobile Wallet' : '💵 Cash'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-1">
                       <button 
                         onClick={() => openAccountModal(acc)}
-                        className="p-2 text-slate-400 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-dark-700 rounded-lg transition-colors"
+                        className={`p-2 ${branding.text} opacity-70 hover:opacity-100 hover:bg-white/20 rounded-lg transition-all`}
                       >
-                          <Edit2 size={16} />
+                        <Edit2 size={16} />
                       </button>
                       <button 
                         onClick={() => handleDeleteAccount(acc.id)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors"
+                        className={`p-2 ${branding.text} opacity-70 hover:opacity-100 hover:bg-red-500/30 rounded-lg transition-all`}
                       >
-                          <Trash2 size={16} />
+                        <Trash2 size={16} />
                       </button>
+                    </div>
                   </div>
-              </div>
 
-              <div className="space-y-1">
-                 <p className="text-xs text-slate-500 uppercase font-semibold">Current Balance</p>
-                 <h2 className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(acc.balance)}</h2>
+                  <div className="space-y-1 mb-6">
+                    <p className={`text-xs ${branding.text} opacity-70 uppercase font-semibold tracking-wider`}>Current Balance</p>
+                    <h2 className={`text-4xl font-black ${branding.text} tracking-tight`}>{formatCurrency(acc.balance)}</h2>
+                  </div>
+                  
+                  {acc.accountNumber && (
+                    <div className={`pt-4 border-t border-white/20 flex justify-between items-center`}>
+                      <span className={`text-sm ${branding.text} opacity-70`}>Account Number</span>
+                      <span className={`font-mono font-bold ${branding.text} tracking-[0.2em] text-lg`}>
+                        •••• {acc.accountNumber.slice(-4)}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              {acc.accountNumber && (
-                 <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-sm">
-                    <span className="text-slate-500">Account Number</span>
-                    <span className="font-mono font-medium text-slate-700 dark:text-slate-300 tracking-wider">{acc.accountNumber}</span>
-                 </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
           
           <button 
              onClick={() => openAccountModal()}
