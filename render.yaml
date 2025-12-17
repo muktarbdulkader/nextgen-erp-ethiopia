@@ -4,7 +4,7 @@ services:
     name: nextgen-erp-ethiopia
     env: node
     plan: free
-    buildCommand: npm install && npm run build && cd server && npm install && npx prisma db push
+    buildCommand: npm install && npm run build && (cd server && npm install && npx prisma db push)
     startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
