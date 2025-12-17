@@ -8,6 +8,18 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        middlewareMode: false,
+      },
+      preview: {
+        port: 3000,
+        host: '0.0.0.0',
+        allowedHosts: [
+          'localhost',
+          '127.0.0.1',
+          '0.0.0.0',
+          'nextgen-erp-ethiopia.onrender.com',
+          'nextgen-erp-ethiopia.vercel.app',
+        ]
       },
       plugins: [react()],
       define: {
