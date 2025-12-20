@@ -41,16 +41,37 @@ export const MpesaCounter: React.FC = () => {
 
   const fetchMpesaStats = async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+
       const response = await fetch('/api/payments/mpesa-stats', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('M-Pesa stats received:', data);
       setStats(data);
     } catch (error) {
       console.error('Failed to fetch M-Pesa stats:', error);
+      // Set default values on error
+      setStats({
+        totalTransactions: 0,
+        successfulPayments: 0,
+        pendingPayments: 0,
+        totalAmount: 0,
+        todayTransactions: 0,
+        recentPayments: []
+      });
     } finally {
       setIsLoading(false);
     }

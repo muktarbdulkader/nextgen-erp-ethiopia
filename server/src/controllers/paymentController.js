@@ -47,6 +47,17 @@ console.log('🔍 M-Pesa Credentials Debug:', {
   MPESA_BASE_URL: MPESA_BASE_URL
 });
 
+// Check if credentials are properly loaded
+if (!MPESA_CONSUMER_KEY || !MPESA_CONSUMER_SECRET) {
+  console.log('❌ M-Pesa credentials not found in environment variables');
+  console.log('💡 Make sure .env file is loaded and contains valid M-Pesa credentials');
+  console.log('📝 Current credentials status:', {
+    MPESA_CONSUMER_KEY: MPESA_CONSUMER_KEY ? 'SET' : 'MISSING',
+    MPESA_CONSUMER_SECRET: MPESA_CONSUMER_SECRET ? 'SET' : 'MISSING',
+    MPESA_SHORTCODE: MPESA_SHORTCODE ? 'SET' : 'MISSING'
+  });
+}
+
 if (MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET && MPesa && APIClient) {
   try {
     // Initialize the M-Pesa client using official SDK
@@ -62,10 +73,10 @@ if (MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET && MPesa && APIClient) {
       baseUrl: MPESA_BASE_URL
     });
     
-    // Create API client with explicit credentials
+    // Create API client with explicit credentials - ensure they're strings
     const apiClient = new APIClient({
-      consumerKey: MPESA_CONSUMER_KEY,
-      consumerSecret: MPESA_CONSUMER_SECRET,
+      consumerKey: String(MPESA_CONSUMER_KEY),
+      consumerSecret: String(MPESA_CONSUMER_SECRET),
       environment: environment
     });
     
@@ -610,11 +621,25 @@ async function initializeMpesaPayment(req, res, paymentData) {
         try {
           console.log('🔄 Using custom M-Pesa implementation...');
           
+          // Ensure credentials are strings and not undefined
+          const consumerKey = String(MPESA_CONSUMER_KEY || '');
+          const consumerSecret = String(MPESA_CONSUMER_SECRET || '');
+          
+          if (!consumerKey || !consumerSecret || consumerKey === 'undefined' || consumerSecret === 'undefined') {
+            throw new Error('M-Pesa credentials are not properly configured');
+          }
+          
           // Create Bearer token using the correct format (consumer_key:consumer_secret base64 encoded)
-          const credentials = `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`;
+          const credentials = `${consumerKey}:${consumerSecret}`;
           const bearerToken = Buffer.from(credentials).toString('base64');
           
           console.log('Bearer token created (first 20 chars):', bearerToken.substring(0, 20) + '...');
+          console.log('Credentials check:', {
+            keyLength: consumerKey.length,
+            secretLength: consumerSecret.length,
+            keyValid: consumerKey !== 'undefined' && consumerKey.length > 0,
+            secretValid: consumerSecret !== 'undefined' && consumerSecret.length > 0
+          });
           
           // Get access token first
           const tokenResponse = await fetch(`${MPESA_BASE_URL}/v1/token/generate?grant_type=client_credentials`, {
@@ -990,21 +1015,34 @@ exports.getMpesaStats = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    // Create filter for M-Pesa related payments (including all payment methods that go through M-Pesa gateway)
+    const mpesaFilter = {
+      OR: [
+        { gateway: 'mpesa' },
+        { paymentMethod: 'mpesa' },
+        { paymentMethod: 'telebirr' },
+        { paymentMethod: 'cbe' },
+        { paymentMethod: 'card' },
+        { paymentMethod: 'mpesa_c2b' },
+        { paymentMethod: 'mpesa_reversal' }
+      ]
+    };
+
     // Get total transaction counts
     const totalTransactions = await prisma.payment.count({
-      where: { gateway: 'mpesa' }
+      where: mpesaFilter
     });
 
     const successfulPayments = await prisma.payment.count({
       where: { 
-        gateway: 'mpesa',
+        ...mpesaFilter,
         status: 'success' 
       }
     });
 
     const pendingPayments = await prisma.payment.count({
       where: { 
-        gateway: 'mpesa',
+        ...mpesaFilter,
         status: 'pending' 
       }
     });
@@ -1012,7 +1050,7 @@ exports.getMpesaStats = async (req, res) => {
     // Get total amount from successful payments
     const totalAmountResult = await prisma.payment.aggregate({
       where: { 
-        gateway: 'mpesa',
+        ...mpesaFilter,
         status: 'success' 
       },
       _sum: { amount: true }
@@ -1021,7 +1059,7 @@ exports.getMpesaStats = async (req, res) => {
     // Get today's transactions
     const todayTransactions = await prisma.payment.count({
       where: {
-        gateway: 'mpesa',
+        ...mpesaFilter,
         createdAt: {
           gte: today,
           lt: tomorrow
@@ -1031,7 +1069,7 @@ exports.getMpesaStats = async (req, res) => {
 
     // Get recent payments (last 10)
     const recentPayments = await prisma.payment.findMany({
-      where: { gateway: 'mpesa' },
+      where: mpesaFilter,
       orderBy: { createdAt: 'desc' },
       take: 10,
       select: {
@@ -1201,8 +1239,16 @@ exports.queryMpesaTransactionStatus = async (req, res) => {
       try {
         console.log('🔍 Querying M-Pesa transaction status...');
         
+        // Ensure credentials are strings and not undefined
+        const consumerKey = String(MPESA_CONSUMER_KEY || '');
+        const consumerSecret = String(MPESA_CONSUMER_SECRET || '');
+        
+        if (!consumerKey || !consumerSecret || consumerKey === 'undefined' || consumerSecret === 'undefined') {
+          throw new Error('M-Pesa credentials are not properly configured');
+        }
+        
         // Get access token
-        const credentials = `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`;
+        const credentials = `${consumerKey}:${consumerSecret}`;
         const bearerToken = Buffer.from(credentials).toString('base64');
         
         const tokenResponse = await fetch(`${MPESA_BASE_URL}/v1/token/generate?grant_type=client_credentials`, {
@@ -1512,12 +1558,29 @@ exports.testMpesaConnection = async (req, res) => {
     }
 
     // Test token generation
-    const credentials = `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`;
+    const consumerKey = String(MPESA_CONSUMER_KEY || '');
+    const consumerSecret = String(MPESA_CONSUMER_SECRET || '');
+    
+    if (!consumerKey || !consumerSecret || consumerKey === 'undefined' || consumerSecret === 'undefined') {
+      return res.json({
+        status: 'error',
+        message: 'M-Pesa credentials are not properly configured',
+        details: {
+          hasConsumerKey: !!MPESA_CONSUMER_KEY && MPESA_CONSUMER_KEY !== 'undefined',
+          hasConsumerSecret: !!MPESA_CONSUMER_SECRET && MPESA_CONSUMER_SECRET !== 'undefined',
+          baseUrl: MPESA_BASE_URL,
+          keyLength: consumerKey.length,
+          secretLength: consumerSecret.length
+        }
+      });
+    }
+    
+    const credentials = `${consumerKey}:${consumerSecret}`;
     const bearerToken = Buffer.from(credentials).toString('base64');
     
     console.log('Testing with credentials:', {
-      consumerKeyLength: MPESA_CONSUMER_KEY.length,
-      consumerSecretLength: MPESA_CONSUMER_SECRET.length,
+      consumerKeyLength: consumerKey.length,
+      consumerSecretLength: consumerSecret.length,
       baseUrl: MPESA_BASE_URL,
       bearerTokenLength: bearerToken.length
     });
@@ -1539,26 +1602,26 @@ exports.testMpesaConnection = async (req, res) => {
         const tokenData = JSON.parse(responseText);
         
         if (tokenData.access_token) {
-          console.log('✅ M-Pesa API connection successful!');
+          console.log('✅ M-Pesa API connection successful');
           
           return res.json({
             status: 'success',
             message: 'M-Pesa API connection successful',
             details: {
               tokenReceived: true,
-              tokenType: tokenData.token_type || 'Bearer',
-              expiresIn: tokenData.expires_in || 'Unknown',
+              tokenLength: tokenData.access_token.length,
+              expiresIn: tokenData.expires_in,
               baseUrl: MPESA_BASE_URL,
-              timestamp: new Date().toISOString()
+              environment: MPESA_BASE_URL.includes('sandbox') ? 'sandbox' : 'production'
             }
           });
         } else {
           return res.json({
             status: 'error',
-            message: 'No access token in response',
+            message: 'No access token received',
             details: {
               response: tokenData,
-              baseUrl: MPESA_BASE_URL
+              status: tokenResponse.status
             }
           });
         }
@@ -1567,7 +1630,8 @@ exports.testMpesaConnection = async (req, res) => {
           status: 'error',
           message: 'Invalid JSON response from M-Pesa API',
           details: {
-            responseText,
+            response: responseText,
+            status: tokenResponse.status,
             parseError: parseError.message
           }
         });
@@ -1575,21 +1639,36 @@ exports.testMpesaConnection = async (req, res) => {
     } else {
       console.log('❌ M-Pesa API connection failed');
       
-      let errorData;
-      try {
-        errorData = JSON.parse(responseText);
-      } catch {
-        errorData = { rawResponse: responseText };
-      }
-
       return res.json({
         status: 'error',
-        message: `M-Pesa API returned ${tokenResponse.status}: ${tokenResponse.statusText}`,
+        message: `M-Pesa API request failed: ${tokenResponse.status} ${tokenResponse.statusText}`,
         details: {
-          statusCode: tokenResponse.status,
+          status: tokenResponse.status,
           statusText: tokenResponse.statusText,
-          response: errorData,
+          response: responseText,
           baseUrl: MPESA_BASE_URL,
+          credentialsConfigured: true
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('M-Pesa connection test error:', error);
+    
+    return res.json({
+      status: 'error',
+      message: 'M-Pesa connection test failed',
+      details: {
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      }
+    });
+  }
+};
+
+/* ============================
+   M-PESA TRANSACTION REVERSAL
+===========================SE_URL,
           credentialsConfigured: true
         }
       });
