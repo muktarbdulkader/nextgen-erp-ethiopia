@@ -378,7 +378,7 @@ exports.updatePaymentMethod = async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    if (!['telebirr', 'cbe', 'card'].includes(paymentMethod)) {
+    if (!['telebirr', 'cbe', 'card', 'mpesa'].includes(paymentMethod)) {
       return res.status(400).json({ message: 'Invalid payment method' });
     }
 

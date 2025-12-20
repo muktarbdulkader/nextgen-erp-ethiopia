@@ -7,7 +7,7 @@ interface PaymentMethodModalProps {
   onClose: () => void;
   planName: string;
   planPrice: string;
-  onMethodSelected: (method: 'telebirr' | 'cbe' | 'card') => void;
+  onMethodSelected: (method: 'telebirr' | 'cbe' | 'card' | 'mpesa') => void;
 }
 
 export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
@@ -17,7 +17,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   planPrice,
   onMethodSelected
 }) => {
-  const [selectedMethod, setSelectedMethod] = useState<'telebirr' | 'cbe' | 'card' | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<'telebirr' | 'cbe' | 'card' | 'mpesa' | null>(null);
   const [step, setStep] = useState<'select' | 'details'>('select');
   
   // Payment details state
@@ -26,10 +26,11 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
+  const [mpesaPhone, setMpesaPhone] = useState('');
 
   if (!isOpen) return null;
 
-  const handleMethodSelect = (method: 'telebirr' | 'cbe' | 'card') => {
+  const handleMethodSelect = (method: 'telebirr' | 'cbe' | 'card' | 'mpesa') => {
     setSelectedMethod(method);
     setStep('details');
   };
@@ -43,6 +44,10 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
     // Validate based on selected method
     if (selectedMethod === 'telebirr' && !telebirrPhone) {
       alert('Please enter your Telebirr phone number');
+      return;
+    }
+    if (selectedMethod === 'mpesa' && !mpesaPhone) {
+      alert('Please enter your M-Pesa phone number');
       return;
     }
     if (selectedMethod === 'cbe' && !cbeReference) {
@@ -59,12 +64,20 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
 
   const paymentMethods = [
     {
+      id: 'mpesa' as const,
+      name: 'M-Pesa',
+      icon: Smartphone,
+      description: 'Pay with your M-Pesa mobile wallet',
+      color: 'green',
+      popular: true
+    },
+    {
       id: 'telebirr' as const,
       name: 'Telebirr',
       icon: Smartphone,
       description: 'Pay with your Telebirr mobile wallet',
       color: 'green',
-      popular: true
+      popular: false
     },
     {
       id: 'cbe' as const,
@@ -218,6 +231,17 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
 
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-4">
+                  {selectedMethod === 'mpesa' && (
+                    <>
+                      <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg">
+                        <Smartphone size={24} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white">M-Pesa Payment</h3>
+                        <p className="text-sm text-slate-500">Enter your mobile number</p>
+                      </div>
+                    </>
+                  )}
                   {selectedMethod === 'telebirr' && (
                     <>
                       <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg">
@@ -255,6 +279,27 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
 
                 {/* Payment Form Fields */}
                 <div className="space-y-4">
+                  {selectedMethod === 'mpesa' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Mobile Number *
+                      </label>
+                      <div className="flex">
+                        <span className="inline-flex items-center px-4 rounded-l-lg border border-r-0 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-400 font-medium">
+                          +251
+                        </span>
+                        <input
+                          type="tel"
+                          value={mpesaPhone}
+                          onChange={(e) => setMpesaPhone(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                          className="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-r-lg bg-white dark:bg-dark-900 text-slate-900 dark:text-white outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                          placeholder="912 345 678"
+                          maxLength={9}
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Enter your 9-digit Ethiopian mobile number</p>
+                    </div>
+                  )}
                   {selectedMethod === 'telebirr' && (
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">

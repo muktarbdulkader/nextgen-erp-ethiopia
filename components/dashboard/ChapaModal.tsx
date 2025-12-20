@@ -3,29 +3,48 @@ import { X, Lock, CheckCircle, CreditCard, Smartphone, Building2, Crown, Zap, Ch
 import { Button } from '../ui/Button';
 import { api } from '../../services/api';
 
+/**
+ * ChapaModal - Payment Gateway Component
+ * 
+ * NOTE: All payment methods (Telebirr, M-Pesa, CBE Birr, Card) are now processed
+ * through the M-Pesa API gateway instead of Chapa. The modal name is kept for
+ * backward compatibility, but the backend routes all payments via M-Pesa STK Push.
+ */
+
 interface ChapaModalProps {
   isOpen: boolean;
   onClose: () => void;
   mode?: 'payment' | 'upgrade';
   companyName?: string;
   initialAmount?: number;
+  onPaymentSuccess?: (txRef: string, paymentData: any) => void;
 }
 
-type PaymentMethod = 'telebirr' | 'cbe' | 'card';
+type PaymentMethod = 'telebirr' | 'cbe' | 'card' | 'mpesa';
 
 export const ChapaModal: React.FC<ChapaModalProps> = ({ 
   isOpen, 
   onClose, 
   mode = 'payment',
   companyName = 'Your Company',
-  initialAmount = 0
+  initialAmount = 0,
+  onPaymentSuccess
 }) => {
   const [method, setMethod] = useState<PaymentMethod>('telebirr');
   const [isLoading, setIsLoading] = useState(false);
   // Use initialAmount if provided, otherwise default based on mode
-  const [amount, setAmount] = useState<number>(
-    initialAmount > 0 ? initialAmount : (mode === 'upgrade' ? 2500 : 0)
-  );
+  const [amount, setAmount] = useState<number>(() => {
+    if (initialAmount && initialAmount > 0) {
+      return initialAmount;
+    }
+    // Default amounts for upgrade mode based on plan name
+    if (mode === 'upgrade') {
+      if (companyName === 'Growth') return 2500;
+      if (companyName === 'Enterprise') return 10000;
+      return 2500; // Default to Growth plan price
+    }
+    return 0;
+  });
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
@@ -80,22 +99,47 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
           const [firstName, ...lastNameParts] = userFirstName.split(' ');
           const lastName = lastNameParts.join(' ') || userLastName || 'User';
 
+          // Get phone number for M-Pesa payments
+          let phoneNumber = '';
+          if (method === 'mpesa') {
+              const phoneInput = document.querySelector('input[type="tel"]') as HTMLInputElement;
+              phoneNumber = phoneInput?.value || '';
+          }
+
           // Initialize transaction
+          // All payment methods now route through M-Pesa API
           const response = await api.payment.initialize({
               amount: amount,
               email: userEmail,
-              first_name: firstName || "Customer",
-              last_name: lastName,
+              firstName: firstName || "Customer",
+              lastName: lastName,
               description: isUpgrade ? "Growth Plan Subscription" : `Payment from ${companyName}`,
-              category: 'Sales'
+              category: 'Sales',
+              type: isUpgrade ? 'subscription' : 'order',
+              paymentMethod: method, // telebirr, mpesa, cbe, or card - all via M-Pesa gateway
+              phoneNumber: phoneNumber
           });
 
-          if (response.data && response.data.checkout_url) {
-              // Redirect to Chapa checkout
-              window.location.href = response.data.checkout_url;
+          if (response.status === 'success') {
+              // All methods now use M-Pesa gateway - show realistic M-Pesa message
+              setIsLoading(false);
+              const methodName = method === 'telebirr' ? 'Telebirr' : 
+                                method === 'cbe' ? 'CBE Birr' :
+                                method === 'card' ? 'Card' : 'M-Pesa';
+              
+              if (onPaymentSuccess && response.data?.tx_ref) {
+                // For registration flow, call success callback
+                onPaymentSuccess(response.data.tx_ref, response.data);
+              } else {
+                // Show realistic M-Pesa message
+                const phoneNumber = (document.querySelector('input[type="tel"]') as HTMLInputElement)?.value || '';
+                const formattedPhone = phoneNumber.startsWith('0') ? '+251' + phoneNumber.substring(1) : '+251' + phoneNumber;
+                alert(`STK Push sent to ${formattedPhone}. Enter your M-Pesa PIN to complete the ${amount.toLocaleString()} ETB payment.`);
+              }
+              onClose();
           } else {
               setIsLoading(false);
-              alert('Failed to initialize payment');
+              alert('Payment request failed. Please try again.');
           }
       } catch (e: any) {
           console.error("Payment init failed", e);
@@ -108,11 +152,11 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="bg-white dark:bg-dark-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up my-8">
-        {/* Chapa Header */}
-        <div className={`p-4 flex items-center justify-between ${isUpgrade ? 'bg-gradient-to-r from-brand-600 to-accent-500' : 'bg-[#1C8D58]'}`}>
+        {/* Payment Header - All methods via M-Pesa */}
+        <div className={`p-4 flex items-center justify-between ${isUpgrade ? 'bg-gradient-to-r from-brand-600 to-accent-500' : 'bg-green-600'}`}>
            <div className="flex items-center gap-2">
                {isUpgrade && <Crown size={20} className="text-white fill-white/20" />}
-               <div className="text-white font-bold text-lg tracking-wide">{isUpgrade ? 'muktiAp Premium' : 'Chapa'}</div>
+               <div className="text-white font-bold text-lg tracking-wide">{isUpgrade ? 'muktiAp Premium' : 'M-Pesa Gateway'}</div>
            </div>
            <button onClick={onClose} className="text-white/80 hover:text-white"><X size={20} /></button>
         </div>
@@ -194,24 +238,31 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
                     </>
                 )}
                 
-                <div className="flex gap-2 mb-2">
+                <div className="grid grid-cols-2 gap-2 mb-2">
                    <button 
                         onClick={() => setMethod('telebirr')}
-                        className={`flex-1 p-2 border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${method === 'telebirr' ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-dark-700'}`}
+                        className={`p-2 border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${method === 'telebirr' ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-dark-700'}`}
                    >
                       <Smartphone size={16} />
                       <span className="text-[10px] font-bold">Telebirr</span>
                    </button>
                    <button 
+                        onClick={() => setMethod('mpesa')}
+                        className={`p-2 border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${method === 'mpesa' ? 'border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-dark-700'}`}
+                   >
+                      <Smartphone size={16} />
+                      <span className="text-[10px] font-bold">M-Pesa</span>
+                   </button>
+                   <button 
                         onClick={() => setMethod('cbe')}
-                        className={`flex-1 p-2 border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${method === 'cbe' ? 'border-[#800080] bg-purple-50 dark:bg-purple-900/20 text-[#800080] dark:text-purple-400' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-dark-700'}`}
+                        className={`p-2 border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${method === 'cbe' ? 'border-[#800080] bg-purple-50 dark:bg-purple-900/20 text-[#800080] dark:text-purple-400' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-dark-700'}`}
                    >
                       <Building2 size={16} />
                       <span className="text-[10px] font-bold">CBE Birr</span>
                    </button>
                    <button 
                         onClick={() => setMethod('card')}
-                        className={`flex-1 p-2 border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${method === 'card' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-dark-700'}`}
+                        className={`p-2 border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${method === 'card' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-dark-700'}`}
                    >
                       <CreditCard size={16} />
                       <span className="text-[10px] font-bold">Card</span>
@@ -222,42 +273,45 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
                 <div className="bg-slate-50 dark:bg-dark-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700 animate-fade-in">
                     {method === 'telebirr' && (
                         <div>
-                             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Mobile Number</label>
+                             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Mobile Number (via M-Pesa Gateway)</label>
                              <div className="flex">
                                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-dark-800 text-slate-500 text-sm">+251</span>
                                 <input type="tel" className="flex-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-r-lg bg-white dark:bg-dark-900 text-sm outline-none focus:border-green-500" placeholder="911 234 567" />
                              </div>
+                             <p className="text-xs text-slate-500 mt-1">Telebirr payments processed via M-Pesa gateway</p>
+                        </div>
+                    )}
+
+                    {method === 'mpesa' && (
+                        <div>
+                             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">M-Pesa Number</label>
+                             <div className="flex">
+                                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-dark-800 text-slate-500 text-sm">+251</span>
+                                <input type="tel" className="flex-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-r-lg bg-white dark:bg-dark-900 text-sm outline-none focus:border-green-500" placeholder="912 345 678" />
+                             </div>
+                             <p className="text-xs text-slate-500 mt-1">Enter your M-Pesa registered mobile number</p>
                         </div>
                     )}
 
                     {method === 'cbe' && (
-                        <div className="space-y-3">
-                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Reference Code / Account</label>
-                                <input type="text" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-dark-900 text-sm outline-none focus:border-[#800080]" placeholder="Enter CBE reference" />
+                        <div>
+                             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Mobile Number (CBE via M-Pesa Gateway)</label>
+                             <div className="flex">
+                                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-dark-800 text-slate-500 text-sm">+251</span>
+                                <input type="tel" className="flex-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-r-lg bg-white dark:bg-dark-900 text-sm outline-none focus:border-green-500" placeholder="911 234 567" />
                              </div>
+                             <p className="text-xs text-slate-500 mt-1">CBE Birr payments processed via M-Pesa gateway</p>
                         </div>
                     )}
 
                     {method === 'card' && (
-                        <div className="space-y-3">
-                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Card Number</label>
-                                <div className="relative">
-                                    <CreditCard size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input type="text" className="w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-dark-900 text-sm outline-none focus:border-blue-500" placeholder="0000 0000 0000 0000" />
-                                </div>
+                        <div>
+                             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Mobile Number (Card via M-Pesa Gateway)</label>
+                             <div className="flex">
+                                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-dark-800 text-slate-500 text-sm">+251</span>
+                                <input type="tel" className="flex-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-r-lg bg-white dark:bg-dark-900 text-sm outline-none focus:border-green-500" placeholder="911 234 567" />
                              </div>
-                             <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Expiry</label>
-                                    <input type="text" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-dark-900 text-sm outline-none focus:border-blue-500" placeholder="MM/YY" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">CVV</label>
-                                    <input type="text" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-dark-900 text-sm outline-none focus:border-blue-500" placeholder="123" />
-                                </div>
-                             </div>
+                             <p className="text-xs text-slate-500 mt-1">Card payments processed via M-Pesa gateway</p>
                         </div>
                     )}
                 </div>
@@ -266,22 +320,20 @@ export const ChapaModal: React.FC<ChapaModalProps> = ({
             <Button 
                 className={`w-full mt-4 transition-colors ${
                     isUpgrade ? 'bg-gradient-to-r from-brand-600 to-accent-500 hover:from-brand-700 hover:to-accent-600' :
-                    method === 'telebirr' ? 'bg-[#1C8D58] hover:bg-[#157a4a]' : 
-                    method === 'cbe' ? 'bg-[#800080] hover:bg-[#660066]' :
-                    'bg-blue-600 hover:bg-blue-700'
+                    'bg-green-600 hover:bg-green-700'
                 }`}
                 onClick={handlePay}
                 disabled={isLoading}
             >
                 {isLoading ? 'Processing...' : (
-                    isUpgrade ? `Subscribe via ${method === 'telebirr' ? 'Telebirr' : method === 'cbe' ? 'CBE' : 'Card'}` :
-                    `Pay ${amount.toLocaleString()} ETB`
+                    isUpgrade ? `Subscribe via ${method === 'telebirr' ? 'Telebirr' : method === 'mpesa' ? 'M-Pesa' : method === 'cbe' ? 'CBE' : 'Card'} (M-Pesa Gateway)` :
+                    `Pay ${amount.toLocaleString()} ETB via M-Pesa`
                 )}
             </Button>
             
             <div className="mt-4 flex items-center justify-center gap-1 text-[10px] text-slate-400">
                 <CheckCircle size={10} />
-                Powered by Chapa
+                Powered by M-Pesa Gateway
             </div>
         </div>
       </div>

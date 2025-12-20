@@ -51,10 +51,40 @@ router.post('/ai/public-chat', aiController.publicAiRateLimiter, ...aiController
 // Chapa Webhook (public - no auth required)
 router.post('/payments/webhook', paymentController.handleWebhook);
 
+// M-Pesa Callback (public - no auth required)
+router.post('/payments/mpesa-callback', paymentController.handleMpesaCallback);
+
+// M-Pesa C2B Validation & Confirmation (public - no auth required)
+router.post('/payments/mpesa-validation', paymentController.handleMpesaValidation);
+router.post('/payments/mpesa-confirmation', paymentController.handleMpesaConfirmation);
+
+// M-Pesa Account Balance Result Callbacks (public - no auth required)
+router.post('/payments/mpesa-balance-result', paymentController.handleMpesaBalanceResult);
+router.post('/payments/mpesa-balance-timeout', paymentController.handleMpesaBalanceTimeout);
+
+// M-Pesa Transaction Reversal Result Callbacks (public - no auth required)
+router.post('/payments/mpesa-reversal-result', paymentController.handleMpesaReversalResult);
+router.post('/payments/mpesa-reversal-timeout', paymentController.handleMpesaReversalTimeout);
+
+// M-Pesa Transaction Status Result Callbacks (public - no auth required)
+router.post('/payments/mpesa-status-result', paymentController.handleMpesaStatusResult);
+router.post('/payments/mpesa-timeout', paymentController.handleMpesaTimeout);
+
+// Quick Payment (public - no auth required for subscription payments)
+router.post('/payments/quick-initialize', paymentController.initializePayment);
+
 // Development only - simulate payment (public for testing)
 if (process.env.NODE_ENV !== 'production') {
   router.post('/payments/simulate', paymentController.simulatePayment);
+  router.post('/payments/simulate-customer', paymentController.simulateCustomerPayment);
 }
+
+// Payment verification (public - no auth required for guest payments)
+router.get('/payments/verify/:tx_ref', paymentController.verifyPayment);
+router.post('/payments/verify-registration', paymentController.verifyPaymentForRegistration);
+
+// M-Pesa Connection Test (public - no auth required for testing)
+router.get('/payments/test-mpesa-connection', paymentController.testMpesaConnection);
 
 // ------------------------------------------
 // PROTECTED ROUTES
@@ -243,9 +273,16 @@ router.post('/notifications/read', notificationController.markRead);
 
 router.get('/payments/config', paymentController.getChapaConfig);
 router.post('/payments/initialize', paymentController.initializePayment);
-router.get('/payments/verify/:tx_ref', paymentController.verifyPayment);
 router.get('/payments/history', paymentController.getPaymentHistory);
 router.get('/payments/subscription', paymentController.getSubscription);
+router.get('/payments/mpesa-stats', paymentController.getMpesaStats);
+router.get('/payments/c2b-stats', paymentController.getC2BStats);
+router.post('/payments/query-status', paymentController.queryMpesaTransactionStatus);
+router.post('/payments/query-balance', paymentController.queryMpesaAccountBalance);
+router.post('/payments/reverse-transaction', paymentController.reverseMpesaTransaction);
+router.post('/payments/register-urls', paymentController.registerMpesaUrls);
+router.post('/payments/simulate-customer-payment', paymentController.simulateCustomerPayment);
+router.get('/payments/mpesa-config', paymentController.getMpesaConfiguration);
 
 // ------------------------------------------
 // BILLING & SUBSCRIPTIONS

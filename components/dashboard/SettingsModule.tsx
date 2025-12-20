@@ -253,7 +253,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ user, onUpdateUs
                         <div className="mt-6">
                              <div className="text-3xl font-bold text-slate-900 dark:text-white">
                                 {(subscription?.plan || user?.plan) === 'Growth' ? '2,500 ETB' : 
-                                 (subscription?.plan || user?.plan) === 'Enterprise' ? '7,500 ETB' : '0 ETB'} 
+                                 (subscription?.plan || user?.plan) === 'Enterprise' ? '10,000 ETB' : '0 ETB'} 
                                 <span className="text-sm font-normal text-slate-500"> / month</span>
                              </div>
                              <p className="text-xs text-slate-500 mt-2">

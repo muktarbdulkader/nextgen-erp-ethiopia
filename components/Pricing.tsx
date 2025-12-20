@@ -4,7 +4,7 @@ import { Check, Zap, Sparkles, Crown, Building2, ArrowRight } from 'lucide-react
 import { Button } from './ui/Button';
 
 interface PricingProps {
-  onPlanSelect: (planName: string, price: string) => void;
+  onPlanSelect: (planName: string, price: string, requiresPayment: boolean) => void;
 }
 
 export const Pricing: React.FC<PricingProps> = ({ onPlanSelect }) => {
@@ -58,9 +58,9 @@ export const Pricing: React.FC<PricingProps> = ({ onPlanSelect }) => {
     {
       name: 'Enterprise',
       icon: <Building2 className="w-6 h-6" />,
-      price: 'Custom',
-      annualPrice: 'Custom',
-      period: '',
+      price: currency === 'ETB' ? '10,000 ETB' : '$199 USD',
+      annualPrice: currency === 'ETB' ? '100,000 ETB' : '$1,990 USD',
+      period: isAnnual ? '/ year' : '/ month',
       desc: 'Tailored solutions for large organizations.',
       gradient: 'from-slate-700 to-slate-900',
       shadowColor: 'shadow-slate-900/20',
@@ -70,7 +70,8 @@ export const Pricing: React.FC<PricingProps> = ({ onPlanSelect }) => {
         'Dedicated Account Manager',
         'On-premise Deployment Option',
         'API Access',
-        'SLA Guarantee'
+        'SLA Guarantee',
+        'Custom Integrations'
       ],
       cta: 'Contact Sales',
       popular: false
@@ -90,7 +91,7 @@ export const Pricing: React.FC<PricingProps> = ({ onPlanSelect }) => {
     visible: { 
       opacity: 1, 
       y: 0,
-      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as any }
     }
   };
 
@@ -332,7 +333,11 @@ export const Pricing: React.FC<PricingProps> = ({ onPlanSelect }) => {
                   variant={plan.popular ? 'gradient' : 'outline'} 
                   fullWidth
                   className="relative z-10"
-                  onClick={() => onPlanSelect(plan.name, isAnnual ? plan.annualPrice : plan.price)}
+                  onClick={() => onPlanSelect(
+                    plan.name, 
+                    isAnnual ? plan.annualPrice : plan.price,
+                    plan.name !== 'Starter' // Require payment for non-Starter plans
+                  )}
                   rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
                   {plan.cta}

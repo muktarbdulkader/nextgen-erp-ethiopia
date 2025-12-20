@@ -38,8 +38,8 @@ export const translations = {
     // Auth
     loginTitle: 'Welcome back',
     loginSubtitle: 'Enter your credentials to access your dashboard.',
-    createAccount: 'Create an account',
-    joinBusiness: 'Join businesses worldwide scaling with muktiAp.',
+    createAccount: 'Register Your Business',
+    joinBusiness: 'Set up your business account and start managing your operations.',
     firstName: 'First Name',
     lastName: 'Last Name',
     companyName: 'Company Name',
@@ -184,8 +184,8 @@ export const translations = {
     // Auth
     loginTitle: 'እንኳን ደህና መጡ',
     loginSubtitle: 'ዳሽቦርድዎን ለማግኘት መረጃዎችዎን ያስገቡ።',
-    createAccount: 'መለያ ይፍጠሩ',
-    joinBusiness: 'በmuktiAp ከሚሰሩ ዓለም አቀፍ ንግዶች ጋር ይቀላቀሉ።',
+    createAccount: 'የንግድ ድርጅትዎን ይመዝግቡ',
+    joinBusiness: 'የንግድ ድርጅትዎን መለያ ያዘጋጁ እና ስራዎችዎን ማስተዳደር ይጀምሩ።',
     firstName: 'የመጀመሪያ ስም',
     lastName: 'የአባት ስም',
     companyName: 'የድርጅት ስም',
@@ -330,8 +330,8 @@ export const translations = {
     // Auth
     loginTitle: 'Baga Nagaan Deebitan',
     loginSubtitle: 'Daashboordii keessan argachuuf odeeffannoo galchaa.',
-    createAccount: 'Herrega Uumi',
-    joinBusiness: 'Daldaltoota addunyaa muktiAp fayyadamanitti makamaa.',
+    createAccount: 'Daldala Keessan Galmeessaa',
+    joinBusiness: 'Herrega daldala keessanii qopheessaatii hojii keessan bulchuu jalqabaa.',
     firstName: 'Maqaa Duraa',
     lastName: 'Maqaa Abbaa',
     companyName: 'Maqaa Dhaabbataa',

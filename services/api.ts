@@ -245,13 +245,26 @@ export const api = {
         return await fetchClient<{ publicKey: string | null; isTestMode: boolean; isConfigured: boolean }>('/payments/config');
     },
     initialize: async (data: any) => {
-        return await fetchClient<any>('/payments/initialize', {
+        // Use quick-initialize for subscription payments without auth
+        const endpoint = data.type === 'subscription' && !localStorage.getItem('auth_token') 
+          ? '/payments/quick-initialize' 
+          : '/payments/initialize';
+        
+        return await fetchClient<any>(endpoint, {
             method: 'POST',
             body: JSON.stringify(data)
         });
     },
     verify: async (txRef: string) => {
-        return await fetchClient<any>(`/payments/verify/${txRef}`);
+        // Use direct fetch for public verification (no auth required)
+        const response = await fetch(`${API_BASE_URL}/payments/verify/${txRef}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
     },
     simulate: async (txRef: string, status: 'success' | 'failed' = 'success') => {
         return await fetchClient<any>('/payments/simulate', {

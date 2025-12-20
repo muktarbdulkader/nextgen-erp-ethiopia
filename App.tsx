@@ -11,9 +11,14 @@ import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { PartnerModal } from './components/PartnerModal';
 import { PaymentMethodModal } from './components/PaymentMethodModal';
+import { QuickMpesaModal } from './components/QuickMpesaModal';
+import { PaymentSuccessPage } from './components/PaymentSuccessPage';
+import { ChapaModal } from './components/dashboard/ChapaModal';
+import { PaymentVerification } from './components/auth/PaymentVerification';
+import { EmailCollectionModal } from './components/auth/EmailCollectionModal';
 import { User, LanguageCode } from './types';
 
-type ViewState = 'landing' | 'login' | 'register' | 'dashboard';
+type ViewState = 'landing' | 'login' | 'register' | 'dashboard' | 'payment-success';
 
 function App() {
   const [darkMode, setDarkMode] = useState(false);
@@ -21,9 +26,16 @@ function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [isEmailCollectionModalOpen, setIsEmailCollectionModalOpen] = useState(false);
+  const [isChapaModalOpen, setIsChapaModalOpen] = useState(false);
+  const [isPaymentVerificationOpen, setIsPaymentVerificationOpen] = useState(false);
+  const [isQuickMpesaModalOpen, setIsQuickMpesaModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | undefined>(undefined);
   const [selectedPlanPrice, setSelectedPlanPrice] = useState<string>('');
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'telebirr' | 'cbe' | 'card' | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'telebirr' | 'cbe' | 'card' | 'mpesa' | null>(null);
+  const [paymentTxRef, setPaymentTxRef] = useState<string>('');
+  const [registrationEmail, setRegistrationEmail] = useState<string>('');
+  const [verifiedPaymentData, setVerifiedPaymentData] = useState<any>(null);
   const [language, setLanguage] = useState<LanguageCode>('EN');
 
   // Initialize theme based on preference
@@ -125,7 +137,23 @@ function App() {
             onNavigateToLogin={() => setCurrentView('login')}
             onBack={() => setCurrentView('landing')}
             selectedPlan={selectedPlan}
+            selectedPaymentMethod={selectedPaymentMethod}
+            verifiedPaymentData={verifiedPaymentData}
+            registrationEmail={registrationEmail}
             language={language}
+        />
+      );
+
+    case 'payment-success':
+      return (
+        <PaymentSuccessPage
+          planName={selectedPlan || 'Growth'}
+          planPrice={selectedPlanPrice}
+          txRef={paymentTxRef}
+          onContinueToRegister={() => {
+            setSelectedPaymentMethod('mpesa');
+            setCurrentView('register');
+          }}
         />
       );
 
@@ -146,21 +174,23 @@ function App() {
             
             <Features />
 
-            <Pricing onPlanSelect={(plan, price) => {
-              setSelectedPlan(plan);
-              setSelectedPlanPrice(price);
-              
-              // For free plan, go directly to register
-              if (plan === 'Starter') {
-                setCurrentView('register');
-              } else if (plan === 'Enterprise') {
-                // For enterprise, open contact modal
-                setIsPartnerModalOpen(true);
-              } else {
-                // For paid plans, show payment method selection
-                setIsPaymentMethodModalOpen(true);
-              }
-            }} />
+            <Pricing 
+              onPlanSelect={(plan, price, requiresPayment) => {
+                setSelectedPlan(plan);
+                setSelectedPlanPrice(price);
+                
+                // For free plan, go directly to register
+                if (plan === 'Starter' || !requiresPayment) {
+                  setCurrentView('register');
+                } else if (plan === 'Enterprise') {
+                  // For enterprise, open contact modal
+                  setIsPartnerModalOpen(true);
+                } else {
+                  // For paid plans, show payment method selection
+                  setIsPaymentMethodModalOpen(true);
+                }
+              }}
+            />
 
             {/* AI Showcase Section */}
             <section id="ai-demo" className="py-24 bg-slate-100 dark:bg-dark-800/50">
@@ -243,7 +273,62 @@ function App() {
             onMethodSelected={(method) => {
               setSelectedPaymentMethod(method);
               setIsPaymentMethodModalOpen(false);
-              setCurrentView('register');
+              setIsEmailCollectionModalOpen(true);
+            }}
+          />
+
+          <EmailCollectionModal
+            isOpen={isEmailCollectionModalOpen}
+            onClose={() => setIsEmailCollectionModalOpen(false)}
+            planName={selectedPlan || 'Growth'}
+            planPrice={selectedPlanPrice}
+            onEmailSubmitted={(email) => {
+              setRegistrationEmail(email);
+              setIsEmailCollectionModalOpen(false);
+              setIsChapaModalOpen(true);
+            }}
+          />
+
+          <ChapaModal
+            isOpen={isChapaModalOpen}
+            onClose={() => setIsChapaModalOpen(false)}
+            mode="upgrade"
+            companyName={selectedPlan || 'Growth'}
+            initialAmount={selectedPlan === 'Growth' ? 2500 : selectedPlan === 'Enterprise' ? 10000 : 0}
+            onPaymentSuccess={(txRef, paymentData) => {
+              setPaymentTxRef(txRef);
+              setIsChapaModalOpen(false);
+              setIsPaymentVerificationOpen(true);
+            }}
+          />
+
+          {isPaymentVerificationOpen && (
+            <PaymentVerification
+              txRef={paymentTxRef}
+              planName={selectedPlan || 'Growth'}
+              email={registrationEmail}
+              onVerified={(paymentData) => {
+                setVerifiedPaymentData(paymentData);
+                setIsPaymentVerificationOpen(false);
+                setCurrentView('register');
+              }}
+              onCancel={() => {
+                setIsPaymentVerificationOpen(false);
+                setIsChapaModalOpen(true); // Go back to payment
+              }}
+            />
+          )}
+
+          <QuickMpesaModal
+            isOpen={isQuickMpesaModalOpen}
+            onClose={() => setIsQuickMpesaModalOpen(false)}
+            planName={selectedPlan || 'Growth'}
+            planPrice={selectedPlanPrice}
+            onPaymentSuccess={(txRef) => {
+              setIsQuickMpesaModalOpen(false);
+              setPaymentTxRef(txRef);
+              setSelectedPaymentMethod('mpesa');
+              setCurrentView('payment-success');
             }}
           />
         </div>

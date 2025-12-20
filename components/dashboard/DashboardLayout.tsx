@@ -25,6 +25,7 @@ import { HRModule } from './HRModule';
 import { SalesModule } from './SalesModule';
 import { RevenueChart } from './RevenueChart';
 import { ContactModal } from './ContactModal';
+import { MpesaCounter } from './MpesaCounter';
 import { ModuleType, User, LanguageCode, Employee } from '../../types';
 import { translations } from '../../utils/translations';
 import { ArrowUpRight, TrendingUp, Users, AlertCircle, Wallet, Settings, Sparkles, X, Loader2, CheckCircle, Package, LifeBuoy } from 'lucide-react';
@@ -399,7 +400,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
                     </div>
 
                     {/* Right Column */}
-                    <div className="lg:col-span-1">
+                    <div className="lg:col-span-1 space-y-6">
+                    {/* M-Pesa Counter */}
+                    <MpesaCounter />
+                    
                     {/* Quick Actions */}
                     <div className="bg-white dark:bg-dark-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 animate-fade-in-up animation-delay-300">
                         <h3 className={`font-bold text-sm mb-4 ${language === 'AM' ? 'ethiopic-text' : ''}`}>{t.quickActions}</h3>
@@ -499,6 +503,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, user
         onClose={() => setShowChapa(false)} 
         mode={chapaMode}
         companyName={user?.displayCompanyName || user?.companyName || 'Your Company'}
+        initialAmount={chapaMode === 'upgrade' ? 2500 : 0}
       />
       <InvoiceModal isOpen={showInvoice} onClose={() => setShowInvoice(false)} />
       <ContactModal isOpen={showContact} onClose={() => setShowContact(false)} language={language} />

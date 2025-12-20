@@ -12,10 +12,13 @@ interface RegisterPageProps {
   onNavigateToLogin: () => void;
   onBack: () => void;
   selectedPlan?: string;
+  selectedPaymentMethod?: 'telebirr' | 'cbe' | 'card' | 'mpesa' | null;
+  verifiedPaymentData?: any;
+  registrationEmail?: string;
   language: LanguageCode;
 }
 
-export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNavigateToLogin, onBack, selectedPlan, language }) => {
+export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNavigateToLogin, onBack, selectedPlan, selectedPaymentMethod, verifiedPaymentData, registrationEmail, language }) => {
   const t = translations[language];
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,8 +26,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNaviga
     firstName: '',
     lastName: '',
     companyName: '',
-    email: '',
+    email: registrationEmail || '',
     password: '',
+    phone: '',
     country: 'Ethiopia',
     plan: selectedPlan || 'Starter',
     role: 'User',
@@ -43,8 +47,75 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNaviga
     setError('');
     
     try {
-        const user = await api.auth.register(formData);
-        onRegister(user);
+        // If we have verified payment data, skip payment initialization
+        if (verifiedPaymentData && verifiedPaymentData.verified) {
+            console.log('Using verified payment data:', verifiedPaymentData);
+            
+            // Register with verified payment
+            const user = await api.auth.register({
+                ...formData,
+                paymentTxRef: verifiedPaymentData.txRef,
+                plan: verifiedPaymentData.planName || selectedPlan,
+                paymentVerified: true
+            });
+            onRegister(user);
+            return;
+        }
+        
+        // For paid plans without verified payment, initialize payment first
+        if (selectedPlan && selectedPlan !== 'Starter' && selectedPaymentMethod) {
+            const planPrices = {
+                'Growth': 2500,
+                'Enterprise': 10000
+            };
+            
+            const amount = planPrices[selectedPlan as keyof typeof planPrices] || 0;
+            
+            if (amount > 0) {
+                // Initialize payment
+                const paymentData = {
+                    amount,
+                    email: formData.email,
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    description: `${selectedPlan} Plan Subscription`,
+                    category: 'Subscription',
+                    type: 'subscription',
+                    paymentMethod: selectedPaymentMethod,
+                    phoneNumber: selectedPaymentMethod === 'mpesa' ? formData.phone : undefined
+                };
+                
+                const paymentResponse = await api.payment.initialize(paymentData);
+                
+                if (paymentResponse.status === 'success' && paymentResponse.data?.checkout_url) {
+                    // For M-Pesa, show instructions instead of redirecting
+                    if (selectedPaymentMethod === 'mpesa') {
+                        alert('Please check your phone for the M-Pesa payment prompt. Complete the payment to continue with registration.');
+                        // You might want to show a modal here instead of alert
+                    } else {
+                        // For other payment methods, redirect to checkout
+                        window.open(paymentResponse.data.checkout_url, '_blank');
+                    }
+                    
+                    // Continue with registration after payment initialization
+                    const user = await api.auth.register({
+                        ...formData,
+                        paymentTxRef: paymentResponse.data.tx_ref
+                    });
+                    onRegister(user);
+                } else {
+                    throw new Error(paymentResponse.message || 'Payment initialization failed');
+                }
+            } else {
+                // Free plan
+                const user = await api.auth.register(formData);
+                onRegister(user);
+            }
+        } else {
+            // Free plan or no payment method selected
+            const user = await api.auth.register(formData);
+            onRegister(user);
+        }
     } catch (err: any) {
         setError(err.message || 'Registration failed.');
     } finally {
@@ -60,7 +131,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNaviga
           firstName: 'New',
           lastName: 'User',
           email: `user@${provider.toLowerCase()}.com`,
-          companyName: 'International Business Ltd',
+          companyName: 'My Business',
           plan: formData.plan
       };
       setIsLoading(false);
@@ -109,6 +180,30 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNaviga
            </div>
         </div>
 
+        {/* Payment Verification Status */}
+        {verifiedPaymentData && verifiedPaymentData.verified && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <CheckCircle size={16} className="text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-green-800 dark:text-green-200">
+                  ✅ M-Pesa Payment Confirmed
+                </h4>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {verifiedPaymentData.amount?.toLocaleString()} ETB successfully paid via M-Pesa
+                </p>
+                {verifiedPaymentData.txRef && (
+                  <p className="text-xs text-green-500 font-mono mt-1">
+                    Transaction: {verifiedPaymentData.txRef}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
             <Input 
                 label={t.firstName}
@@ -132,7 +227,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNaviga
         <Input 
             label={t.companyName}
             name="companyName" 
-            placeholder="Abyssinia Trading PLC" 
+            placeholder="Your Business Name" 
             icon={Building2} 
             required 
             value={formData.companyName}
@@ -237,6 +332,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNaviga
                     Enter the {formData.role.toLowerCase()} access code to register with this role. Contact your system administrator if you don't have the code.
                 </p>
                 <Input 
+                    label={`${formData.role} Access Code`}
                     name="adminCode" 
                     type="password" 
                     placeholder={`Enter ${formData.role.toLowerCase()} access code`}
