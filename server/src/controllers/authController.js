@@ -4,8 +4,13 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'mukti-secret-key-change-me';
-const REFRESH_SECRET = process.env.REFRESH_SECRET || 'mukti-refresh-secret-change-me';
+const JWT_SECRET = process.env.JWT_SECRET;
+const REFRESH_SECRET = process.env.REFRESH_SECRET;
+
+// Fail fast if secrets are not provided
+if (!JWT_SECRET || !REFRESH_SECRET) {
+  throw new Error('JWT_SECRET and REFRESH_SECRET environment variables are required for security');
+}
 
 // Default access codes from environment (used for first registration)
 const DEFAULT_ADMIN_CODE = process.env.ADMIN_ACCESS_CODE || 'mukti123';
