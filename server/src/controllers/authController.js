@@ -1,9 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'mukti-secret-key-change-me';
+const REFRESH_SECRET = process.env.REFRESH_SECRET || 'mukti-refresh-secret-change-me';
 
 // Default access codes from environment (used for first registration)
 const DEFAULT_ADMIN_CODE = process.env.ADMIN_ACCESS_CODE || 'mukti123';
@@ -17,10 +19,15 @@ const DEFAULT_ROLES = [
   { name: 'Viewer', permissions: ['View Data Only'], isDefault: true }
 ];
 
+// Generate secure random refresh token
+function generateRefreshToken() {
+  return crypto.randomBytes(64).toString('hex');
+}
+
 // Initialize default roles for a company
 async function initializeDefaultRoles(companyName) {
   const existingRoles = await prisma.role.findMany({ where: { companyName } });
-  
+
   if (existingRoles.length === 0) {
     await prisma.role.createMany({
       data: DEFAULT_ROLES.map(role => ({
@@ -44,41 +51,41 @@ exports.register = async (req, res) => {
     // IMPORTANT: Use email as the unique identifier for data isolation
     // This ensures each user's data is completely separate even if they use the same company name
     const finalCompanyName = email; // Always use email for data isolation
-    
+
     // Validate role - only allow valid roles
     const validRoles = ['Admin', 'Manager', 'User', 'Viewer'];
     let selectedRole = validRoles.includes(role) ? role : 'User';
-    
+
     // For Admin/Manager roles, verify access code
     if (selectedRole === 'Admin' || selectedRole === 'Manager') {
       if (!adminCode || adminCode.length < 6) {
         return res.status(400).json({ message: 'Access code must be at least 6 characters' });
       }
-      
+
       // Check if company already has a custom access code for this role
       const existingCode = await prisma.companyAccessCode.findUnique({
         where: { companyName_role: { companyName: finalCompanyName, role: selectedRole } }
       });
-      
+
       if (existingCode) {
         // Company has custom code - verify against it
         const isValidCode = await bcrypt.compare(adminCode, existingCode.code);
         if (!isValidCode) {
-          return res.status(403).json({ 
-            message: `Invalid ${selectedRole.toLowerCase()} access code for this company. Contact your administrator.` 
+          return res.status(403).json({
+            message: `Invalid ${selectedRole.toLowerCase()} access code for this company. Contact your administrator.`
           });
         }
       } else {
         // No custom code - verify against default codes from .env
         const defaultCode = selectedRole === 'Admin' ? DEFAULT_ADMIN_CODE : DEFAULT_MANAGER_CODE;
         if (adminCode !== defaultCode) {
-          return res.status(403).json({ 
-            message: `Invalid ${selectedRole.toLowerCase()} access code. Contact your system administrator.` 
+          return res.status(403).json({
+            message: `Invalid ${selectedRole.toLowerCase()} access code. Contact your system administrator.`
           });
         }
       }
     }
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.log(`📝 Register: ${email} → Company: ${finalCompanyName} → Role: ${selectedRole}`);
     }
@@ -111,7 +118,7 @@ exports.register = async (req, res) => {
       const existingCode = await prisma.companyAccessCode.findUnique({
         where: { companyName_role: { companyName: finalCompanyName, role: selectedRole } }
       });
-      
+
       if (!existingCode) {
         // Hash and save the access code for future registrations
         const hashedCode = await bcrypt.hash(adminCode, 10);
@@ -135,18 +142,36 @@ exports.register = async (req, res) => {
     const permissions = roleData?.permissions || DEFAULT_ROLES.find(r => r.name === selectedRole)?.permissions || ['View Data'];
 
     // Create Token with role and permissions
-    const token = jwt.sign({ 
-      userId: user.id, 
-      email: user.email, 
+    const token = jwt.sign({
+      userId: user.id,
+      email: user.email,
       companyName: user.companyName, // email for data isolation
       displayCompanyName: user.displayCompanyName, // actual company name for display
       role: user.role,
       permissions
-    }, JWT_SECRET, { expiresIn: '30d' });
+    }, JWT_SECRET, { expiresIn: '15m' });
+
+    // Create refresh token
+    const refreshToken = generateRefreshToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt
+      }
+    });
 
     // Return user without password
     const { password: _, ...userWithoutPassword } = user;
-    res.status(201).json({ token, user: { ...userWithoutPassword, permissions } });
+    res.status(201).json({
+      token,
+      refreshToken,
+      expiresIn: '15m',
+      user: { ...userWithoutPassword, permissions }
+    });
 
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -180,21 +205,39 @@ exports.login = async (req, res) => {
     const permissions = roleData?.permissions || ['View Data'];
 
     // Create Token with role and permissions
-    const token = jwt.sign({ 
-      userId: user.id, 
-      email: user.email, 
+    const token = jwt.sign({
+      userId: user.id,
+      email: user.email,
       companyName: user.companyName, // email for data isolation
       displayCompanyName: user.displayCompanyName, // actual company name for display
       role: user.role || 'User',
       permissions
-    }, JWT_SECRET, { expiresIn: '30d' });
+    }, JWT_SECRET, { expiresIn: '15m' });
+
+    // Create refresh token
+    const refreshToken = generateRefreshToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt
+      }
+    });
 
     if (process.env.NODE_ENV === 'development') {
       console.log(`🔐 Login: ${user.email} (${user.role})`);
     }
 
     const { password: _, ...userWithoutPassword } = user;
-    res.json({ token, user: { ...userWithoutPassword, permissions } });
+    res.json({
+      token,
+      refreshToken,
+      expiresIn: '15m',
+      user: { ...userWithoutPassword, permissions }
+    });
 
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -208,7 +251,7 @@ exports.login = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const { userId, companyName } = req.user;
-    
+
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -220,8 +263,8 @@ exports.getMe = async (req, res) => {
     });
 
     const { password: _, ...userWithoutPassword } = user;
-    res.json({ 
-      ...userWithoutPassword, 
+    res.json({
+      ...userWithoutPassword,
       permissions: roleData?.permissions || ['View Data']
     });
   } catch (error) {

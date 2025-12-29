@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const { PrismaClient } = require('@prisma/client');
 const apiRoutes = require('./src/routes/api');
 const logger = require('./src/middleware/logger');
@@ -42,12 +43,12 @@ const corsOptions = {
   origin(origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
+
     // Allow if in allowedOrigins list or is a Vercel domain
     if (allowedOrigins.includes(origin) || isVercelDomain(origin)) {
       return callback(null, true);
     }
-    
+
     console.log("❌ Blocked by CORS:", origin);
     return callback(new Error("Not allowed by CORS"));
   },
@@ -59,6 +60,26 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to all requests
+app.use(limiter);
+
+// Auth-specific rate limiting (stricter)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 auth requests per windowMs
+  skipSuccessfulRequests: true,
+  message: 'Too many authentication attempts, please try again later.',
+});
 
 // Request logging
 if (process.env.NODE_ENV !== 'test') {

@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Controllers
 const authController = require('../controllers/authController');
+const refreshTokenController = require('../controllers/refreshTokenController');
 const employeeController = require('../controllers/employeeController');
 const dashboardController = require('../controllers/dashboardController');
 const financeController = require('../controllers/financeController');
@@ -29,12 +30,23 @@ const approvalsController = require('../controllers/approvalsController');
 const authenticateToken = require('../middleware/auth');
 const { checkPermission, isAdmin } = require('../middleware/checkPermission');
 
+// Rate limiting for auth routes
+const rateLimit = require('express-rate-limit');
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 auth requests per windowMs
+  skipSuccessfulRequests: true,
+  message: 'Too many authentication attempts, please try again later.',
+});
+
 // ------------------------------------------
 // PUBLIC ROUTES
 // ------------------------------------------
 
-router.post('/auth/register', authController.register);
-router.post('/auth/login', authController.login);
+router.post('/auth/register', authLimiter, authController.register);
+router.post('/auth/login', authLimiter, authController.login);
+router.post('/auth/refresh', authLimiter, refreshTokenController.refreshAccessToken);
+router.post('/auth/logout', refreshTokenController.logout);
 // Protected auth routes (after authenticateToken middleware)
 // router.get('/auth/me', authController.getMe); // Added below after auth middleware
 

@@ -81,6 +81,22 @@ model User {
   managedTasks  Task[]          @relation("TaskManager")
   transactions  Transaction[]
   subscription  Subscription?
+  refreshTokens RefreshToken[]
+}
+
+// =============================================
+// REFRESH TOKEN (JWT AUTHENTICATION)
+// =============================================
+model RefreshToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  token     String   @unique
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
 }
 
 // =============================================

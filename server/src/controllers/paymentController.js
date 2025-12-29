@@ -62,7 +62,7 @@ if (MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET && MPesa && APIClient) {
   try {
     // Initialize the M-Pesa client using official SDK
     const environment = MPESA_BASE_URL.includes('sandbox') ? 'sandbox' : 'production';
-    
+
     console.log('M-Pesa Config:', {
       hasConsumerKey: !!MPESA_CONSUMER_KEY,
       hasConsumerSecret: !!MPESA_CONSUMER_SECRET,
@@ -72,17 +72,17 @@ if (MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET && MPesa && APIClient) {
       shortCode: MPESA_SHORTCODE,
       baseUrl: MPESA_BASE_URL
     });
-    
+
     // Create API client with explicit credentials - ensure they're strings
     const apiClient = new APIClient({
       consumerKey: String(MPESA_CONSUMER_KEY),
       consumerSecret: String(MPESA_CONSUMER_SECRET),
       environment: environment
     });
-    
+
     // Initialize M-Pesa with API client
     mpesaClient = new MPesa(apiClient);
-    
+
     console.log('✅ M-Pesa client initialized successfully with official SDK');
   } catch (error) {
     console.error('❌ M-Pesa client initialization failed:', error.message);
@@ -90,9 +90,9 @@ if (MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET && MPesa && APIClient) {
   }
 } else {
   console.log('⚠️ M-Pesa SDK not available or credentials missing');
-  console.log('SDK status:', { 
-    hasKey: !!MPESA_CONSUMER_KEY, 
-    hasSecret: !!MPESA_CONSUMER_SECRET, 
+  console.log('SDK status:', {
+    hasKey: !!MPESA_CONSUMER_KEY,
+    hasSecret: !!MPESA_CONSUMER_SECRET,
     hasMPesa: !!MPesa,
     hasAPIClient: !!APIClient
   });
@@ -108,7 +108,7 @@ const isTestMode = CHAPA_SECRET_KEY?.includes('TEST') || !CHAPA_SECRET_KEY;
 exports.initializePayment = async (req, res) => {
   try {
     const { amount, email, firstName, lastName, description, category, type = 'order', paymentMethod = 'chapa', phoneNumber } = req.body;
-    
+
     // Debug: Log the received amount
     console.log('💰 Payment Request Debug:', {
       receivedAmount: amount,
@@ -117,10 +117,10 @@ exports.initializePayment = async (req, res) => {
       type: type,
       description
     });
-    
+
     // Allow quick payments without authentication for subscription type
     const isQuickPayment = type === 'subscription' && !req.user;
-    
+
     if (!isQuickPayment && (!req.user || !req.user.userId)) {
       return res.status(401).json({ message: 'Authentication required' });
     }
@@ -138,7 +138,7 @@ exports.initializePayment = async (req, res) => {
     if (type !== 'subscription' && type !== 'upgrade' && req.user) {
       // Find or create "Chapa Payments" account
       let chapaAccount = await prisma.account.findFirst({
-        where: { 
+        where: {
           name: 'Chapa Payments',
           companyName: req.user.companyName
         }
@@ -328,7 +328,7 @@ exports.initializePayment = async (req, res) => {
     if (process.env.NODE_ENV === 'development') {
       console.error('Payment Error:', error.message);
     }
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Payment initialization failed',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -377,11 +377,11 @@ exports.verifyPayment = async (req, res) => {
 
         if (verifyResponse.ok) {
           const verifyData = await verifyResponse.json();
-          
+
           if (verifyData.status === 'success' && verifyData.data?.status === 'success') {
             // Update payment status
             await updatePaymentStatus(tx_ref, 'success', verifyData.data);
-            
+
             return res.json({
               status: 'success',
               message: 'Payment verified successfully',
@@ -403,7 +403,7 @@ exports.verifyPayment = async (req, res) => {
 
   } catch (error) {
     console.error('Verify Payment Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Payment verification failed',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -417,18 +417,23 @@ exports.verifyPayment = async (req, res) => {
 exports.handleWebhook = async (req, res) => {
   try {
     const webhookData = req.body;
-    
-    // Verify webhook signature if configured
+
+    // MANDATORY webhook signature verification
     const signature = req.headers['chapa-signature'];
-    if (process.env.CHAPA_WEBHOOK_SECRET && signature) {
-      const hash = crypto
-        .createHmac('sha256', process.env.CHAPA_WEBHOOK_SECRET)
-        .update(JSON.stringify(webhookData))
-        .digest('hex');
-      
-      if (hash !== signature) {
-        return res.status(401).json({ message: 'Invalid signature' });
-      }
+    if (!process.env.CHAPA_WEBHOOK_SECRET) {
+      return res.status(500).json({ message: 'Webhook not properly configured' });
+    }
+    if (!signature) {
+      return res.status(401).json({ message: 'Signature required' });
+    }
+
+    const hash = crypto
+      .createHmac('sha256', process.env.CHAPA_WEBHOOK_SECRET)
+      .update(JSON.stringify(webhookData))
+      .digest('hex');
+
+    if (hash !== signature) {
+      return res.status(401).json({ message: 'Invalid signature' });
     }
 
     const { tx_ref, status, amount, currency } = webhookData;
@@ -539,9 +544,9 @@ async function initializeMpesaPayment(req, res, paymentData) {
   try {
     const { amount, phoneNumber, txRef, description, paymentMethod = 'mpesa' } = paymentData;
 
-    const methodName = paymentMethod === 'telebirr' ? 'Telebirr' : 
-                      paymentMethod === 'cbe' ? 'CBE Birr' :
-                      paymentMethod === 'card' ? 'Card' : 'M-Pesa';
+    const methodName = paymentMethod === 'telebirr' ? 'Telebirr' :
+      paymentMethod === 'cbe' ? 'CBE Birr' :
+        paymentMethod === 'card' ? 'Card' : 'M-Pesa';
 
     // Format Ethiopian phone number (+251 -> 251)
     let formattedPhone = phoneNumber.replace(/^\+/, ''); // Remove + if present
@@ -557,7 +562,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
     if (mpesaClient) {
       try {
         console.log('🔄 Using official M-Pesa SDK...');
-        
+
         // Use official SDK method for STK Push
         const stkPushRequest = {
           phoneNumber: formattedPhone,
@@ -568,7 +573,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
         };
 
         console.log('STK Push Request:', stkPushRequest);
-        
+
         // Call official SDK stkPush method
         const stkResponse = await mpesaClient.stkPush(stkPushRequest);
         console.log('M-Pesa STK Response:', JSON.stringify(stkResponse, null, 2));
@@ -576,11 +581,11 @@ async function initializeMpesaPayment(req, res, paymentData) {
         // Check response format from official SDK
         if (stkResponse && (stkResponse.ResponseCode === '0' || stkResponse.responseCode === '0' || stkResponse.success)) {
           console.log(`✅ ${methodName} payment via M-Pesa STK Push initiated successfully`);
-          
+
           // Extract response data (SDK may use different field names)
           const checkoutRequestId = stkResponse.CheckoutRequestID || stkResponse.checkoutRequestId || stkResponse.CheckoutRequestId;
           const merchantRequestId = stkResponse.MerchantRequestID || stkResponse.merchantRequestId || stkResponse.MerchantRequestId;
-          
+
           // Update payment record with M-Pesa details
           await prisma.payment.update({
             where: { txRef },
@@ -596,7 +601,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
               }
             }
           });
-          
+
           return res.json({
             status: 'success',
             message: `STK Push sent successfully. Please check your phone and enter your M-Pesa PIN.`,
@@ -616,23 +621,23 @@ async function initializeMpesaPayment(req, res, paymentData) {
         }
       } catch (error) {
         console.error('Official M-Pesa SDK error, trying custom implementation:', error.message);
-        
+
         // Try custom implementation using the correct Safaricom Ethiopia API format
         try {
           console.log('🔄 Using custom M-Pesa implementation...');
-          
+
           // Ensure credentials are strings and not undefined
           const consumerKey = String(MPESA_CONSUMER_KEY || '');
           const consumerSecret = String(MPESA_CONSUMER_SECRET || '');
-          
+
           if (!consumerKey || !consumerSecret || consumerKey === 'undefined' || consumerSecret === 'undefined') {
             throw new Error('M-Pesa credentials are not properly configured');
           }
-          
+
           // Create Bearer token using the correct format (consumer_key:consumer_secret base64 encoded)
           const credentials = `${consumerKey}:${consumerSecret}`;
           const bearerToken = Buffer.from(credentials).toString('base64');
-          
+
           console.log('Bearer token created (first 20 chars):', bearerToken.substring(0, 20) + '...');
           console.log('Credentials check:', {
             keyLength: consumerKey.length,
@@ -640,7 +645,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
             keyValid: consumerKey !== 'undefined' && consumerKey.length > 0,
             secretValid: consumerSecret !== 'undefined' && consumerSecret.length > 0
           });
-          
+
           // Get access token first
           const tokenResponse = await fetch(`${MPESA_BASE_URL}/v1/token/generate?grant_type=client_credentials`, {
             method: 'GET',
@@ -649,22 +654,22 @@ async function initializeMpesaPayment(req, res, paymentData) {
               'Content-Type': 'application/json'
             }
           });
-          
+
           if (!tokenResponse.ok) {
             throw new Error(`Token request failed: ${tokenResponse.status} ${tokenResponse.statusText}`);
           }
-          
+
           const tokenData = await tokenResponse.json();
           console.log('Token response:', tokenData);
-          
+
           if (!tokenData.access_token) {
             throw new Error('No access token received');
           }
-          
+
           // Now make STK Push request
           const timestamp = generateMpesaTimestamp();
           const password = Buffer.from(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`).toString('base64');
-          
+
           const stkPushData = {
             BusinessShortCode: MPESA_SHORTCODE,
             Password: password,
@@ -678,9 +683,9 @@ async function initializeMpesaPayment(req, res, paymentData) {
             AccountReference: txRef,
             TransactionDesc: `${description || 'Payment'} via ${methodName}`
           };
-          
+
           console.log('STK Push Data:', stkPushData);
-          
+
           const stkResponse = await fetch(`${MPESA_BASE_URL}/mpesa/stkpush/v3/processrequest`, {
             method: 'POST',
             headers: {
@@ -689,17 +694,17 @@ async function initializeMpesaPayment(req, res, paymentData) {
             },
             body: JSON.stringify(stkPushData)
           });
-          
+
           if (!stkResponse.ok) {
             throw new Error(`STK Push failed: ${stkResponse.status} ${stkResponse.statusText}`);
           }
-          
+
           const stkData = await stkResponse.json();
           console.log('Custom STK Push Response:', JSON.stringify(stkData, null, 2));
-          
+
           if (stkData.ResponseCode === '0') {
             console.log(`✅ ${methodName} payment via custom M-Pesa implementation successful`);
-            
+
             // Update payment record with M-Pesa details
             await prisma.payment.update({
               where: { txRef },
@@ -715,7 +720,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
                 }
               }
             });
-            
+
             return res.json({
               status: 'success',
               message: `STK Push sent successfully. Please check your phone and enter your M-Pesa PIN.`,
@@ -731,7 +736,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
           } else {
             throw new Error(stkData.ResponseDescription || 'Custom STK Push failed');
           }
-          
+
         } catch (customError) {
           console.error('Custom M-Pesa implementation failed:', customError.message);
           console.log('📝 Note: This may be due to expired test credentials or API changes');
@@ -744,7 +749,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
     // Demo mode fallback (for development/hackathon)
     console.log('📱 Using M-Pesa demo mode...');
     console.log('✨ Demo mode provides realistic M-Pesa experience for presentations');
-    
+
     // Simulate realistic M-Pesa payment processing with varied timing
     const processingTime = Math.random() * 2000 + 2000; // 2-4 seconds
     setTimeout(async () => {
@@ -753,7 +758,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
         const receiptPrefixes = ['QEI2', 'QEJ3', 'QEK4', 'QEL5'];
         const randomPrefix = receiptPrefixes[Math.floor(Math.random() * receiptPrefixes.length)];
         const receiptNumber = `${randomPrefix}${Math.random().toString().slice(2, 8).toUpperCase()}`;
-        
+
         await updatePaymentStatus(txRef, 'success', {
           mpesaReceiptNumber: receiptNumber,
           resultCode: 0,
@@ -771,7 +776,7 @@ async function initializeMpesaPayment(req, res, paymentData) {
         console.error('Payment completion error:', error);
       }
     }, processingTime);
-    
+
     return res.json({
       status: 'success',
       message: `STK Push sent successfully. Please check your phone and enter your M-Pesa PIN.`,
@@ -810,7 +815,7 @@ function generateMpesaTimestamp() {
   const hour = String(now.getHours()).padStart(2, '0');
   const minute = String(now.getMinutes()).padStart(2, '0');
   const second = String(now.getSeconds()).padStart(2, '0');
-  
+
   return `${year}${month}${day}${hour}${minute}${second}`;
 }
 
@@ -846,7 +851,7 @@ exports.handleMpesaCallback = async (req, res) => {
 
     if (CallbackMetadata && CallbackMetadata.Item) {
       const items = CallbackMetadata.Item;
-      
+
       for (const item of items) {
         switch (item.Name) {
           case 'MpesaReceiptNumber':
@@ -869,17 +874,17 @@ exports.handleMpesaCallback = async (req, res) => {
     const payment = await prisma.payment.findFirst({
       where: {
         OR: [
-          { 
-            metadata: { 
-              path: ['checkout_request_id'], 
-              equals: CheckoutRequestID 
-            } 
+          {
+            metadata: {
+              path: ['checkout_request_id'],
+              equals: CheckoutRequestID
+            }
           },
-          { 
-            metadata: { 
-              path: ['merchant_request_id'], 
-              equals: MerchantRequestID 
-            } 
+          {
+            metadata: {
+              path: ['merchant_request_id'],
+              equals: MerchantRequestID
+            }
           }
         ]
       }
@@ -895,7 +900,7 @@ exports.handleMpesaCallback = async (req, res) => {
     if (ResultCode === 0) {
       // Payment successful
       console.log(`✅ M-Pesa payment successful: ${mpesaReceiptNumber}`);
-      
+
       await updatePaymentStatus(txRef, 'success', {
         mpesaReceiptNumber,
         resultCode: ResultCode,
@@ -912,11 +917,11 @@ exports.handleMpesaCallback = async (req, res) => {
       if (payment.type === 'subscription' || payment.type === 'upgrade') {
         await handleSubscriptionUpgrade(payment);
       }
-      
+
     } else {
       // Payment failed or cancelled
       console.log(`❌ M-Pesa payment failed: ${ResultDesc} (Code: ${ResultCode})`);
-      
+
       await updatePaymentStatus(txRef, 'failed', {
         resultCode: ResultCode,
         resultDesc: ResultDesc,
@@ -926,16 +931,16 @@ exports.handleMpesaCallback = async (req, res) => {
       });
     }
 
-    res.json({ 
+    res.json({
       ResultCode: 0,
-      ResultDesc: 'Callback processed successfully' 
+      ResultDesc: 'Callback processed successfully'
     });
 
   } catch (error) {
     console.error('M-Pesa Callback Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       ResultCode: 1,
-      ResultDesc: 'Callback processing failed' 
+      ResultDesc: 'Callback processing failed'
     });
   }
 };
@@ -1034,24 +1039,24 @@ exports.getMpesaStats = async (req, res) => {
     });
 
     const successfulPayments = await prisma.payment.count({
-      where: { 
+      where: {
         ...mpesaFilter,
-        status: 'success' 
+        status: 'success'
       }
     });
 
     const pendingPayments = await prisma.payment.count({
-      where: { 
+      where: {
         ...mpesaFilter,
-        status: 'pending' 
+        status: 'pending'
       }
     });
 
     // Get total amount from successful payments
     const totalAmountResult = await prisma.payment.aggregate({
-      where: { 
+      where: {
         ...mpesaFilter,
-        status: 'success' 
+        status: 'success'
       },
       _sum: { amount: true }
     });
@@ -1107,8 +1112,8 @@ exports.verifyPaymentForRegistration = async (req, res) => {
     const { txRef, email, planName } = req.body;
 
     if (!txRef || !email || !planName) {
-      return res.status(400).json({ 
-        message: 'Transaction reference, email, and plan name are required' 
+      return res.status(400).json({
+        message: 'Transaction reference, email, and plan name are required'
       });
     }
 
@@ -1122,19 +1127,19 @@ exports.verifyPaymentForRegistration = async (req, res) => {
     }
 
     if (payment.status !== 'success') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Payment not completed yet',
-        status: payment.status 
+        status: payment.status
       });
     }
 
     // Check if payment matches the plan
-    const expectedAmount = planName === 'Growth' ? 2500 : 
-                          planName === 'Enterprise' ? 10000 : 0;
-    
+    const expectedAmount = planName === 'Growth' ? 2500 :
+      planName === 'Enterprise' ? 10000 : 0;
+
     if (expectedAmount > 0 && Math.abs(payment.amount - expectedAmount) > 1) {
-      return res.status(400).json({ 
-        message: 'Payment amount does not match selected plan' 
+      return res.status(400).json({
+        message: 'Payment amount does not match selected plan'
       });
     }
 
@@ -1203,8 +1208,8 @@ exports.queryMpesaTransactionStatus = async (req, res) => {
     const { transactionId, checkoutRequestId } = req.body;
 
     if (!transactionId && !checkoutRequestId) {
-      return res.status(400).json({ 
-        message: 'Transaction ID or Checkout Request ID is required' 
+      return res.status(400).json({
+        message: 'Transaction ID or Checkout Request ID is required'
       });
     }
 
@@ -1238,19 +1243,19 @@ exports.queryMpesaTransactionStatus = async (req, res) => {
     if (mpesaClient && MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET) {
       try {
         console.log('🔍 Querying M-Pesa transaction status...');
-        
+
         // Ensure credentials are strings and not undefined
         const consumerKey = String(MPESA_CONSUMER_KEY || '');
         const consumerSecret = String(MPESA_CONSUMER_SECRET || '');
-        
+
         if (!consumerKey || !consumerSecret || consumerKey === 'undefined' || consumerSecret === 'undefined') {
           throw new Error('M-Pesa credentials are not properly configured');
         }
-        
+
         // Get access token
         const credentials = `${consumerKey}:${consumerSecret}`;
         const bearerToken = Buffer.from(credentials).toString('base64');
-        
+
         const tokenResponse = await fetch(`${MPESA_BASE_URL}/v1/token/generate?grant_type=client_credentials`, {
           method: 'GET',
           headers: {
@@ -1258,10 +1263,10 @@ exports.queryMpesaTransactionStatus = async (req, res) => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
-          
+
           if (tokenData.access_token) {
             // Query transaction status
             const statusRequest = {
@@ -1277,7 +1282,7 @@ exports.queryMpesaTransactionStatus = async (req, res) => {
               Remarks: "Transaction Status Query",
               Occasion: "Query transaction status"
             };
-            
+
             const statusResponse = await fetch(`${MPESA_BASE_URL}/mpesa/transactionstatus/v1/query`, {
               method: 'POST',
               headers: {
@@ -1286,11 +1291,11 @@ exports.queryMpesaTransactionStatus = async (req, res) => {
               },
               body: JSON.stringify(statusRequest)
             });
-            
+
             if (statusResponse.ok) {
               const statusData = await statusResponse.json();
               console.log('M-Pesa Status Response:', statusData);
-              
+
               return res.json({
                 status: 'success',
                 message: 'Transaction status query initiated',
@@ -1363,7 +1368,7 @@ exports.handleMpesaValidation = async (req, res) => {
     try {
       // Business validation rules
       const amount = parseFloat(TransAmount);
-      
+
       // Example validation rules:
       if (amount <= 0) {
         validationResult = {
@@ -1395,7 +1400,7 @@ exports.handleMpesaValidation = async (req, res) => {
     }
 
     console.log(`📋 C2B Validation result: ${validationResult.ResultCode} - ${validationResult.ResultDesc}`);
-    
+
     res.json(validationResult);
 
   } catch (error) {
@@ -1432,7 +1437,7 @@ exports.handleMpesaConfirmation = async (req, res) => {
     try {
       const amount = parseFloat(TransAmount);
       const customerName = `${FirstName} ${MiddleName || ''} ${LastName || ''}`.trim();
-      
+
       // Create payment record for C2B transaction
       const payment = await prisma.payment.create({
         data: {
@@ -1465,7 +1470,7 @@ exports.handleMpesaConfirmation = async (req, res) => {
 
       // Find or create "M-Pesa C2B" account for accounting
       let c2bAccount = await prisma.account.findFirst({
-        where: { 
+        where: {
           name: 'M-Pesa C2B Payments',
           // For C2B, we might not have a specific company, use a default
           companyName: 'Default'
@@ -1543,7 +1548,7 @@ exports.handleMpesaConfirmation = async (req, res) => {
 exports.testMpesaConnection = async (req, res) => {
   try {
     console.log('🔍 Testing M-Pesa API connectivity...');
-    
+
     // Check if credentials are configured
     if (!MPESA_CONSUMER_KEY || !MPESA_CONSUMER_SECRET) {
       return res.json({
@@ -1560,7 +1565,7 @@ exports.testMpesaConnection = async (req, res) => {
     // Test token generation
     const consumerKey = String(MPESA_CONSUMER_KEY || '');
     const consumerSecret = String(MPESA_CONSUMER_SECRET || '');
-    
+
     if (!consumerKey || !consumerSecret || consumerKey === 'undefined' || consumerSecret === 'undefined') {
       return res.json({
         status: 'error',
@@ -1574,10 +1579,10 @@ exports.testMpesaConnection = async (req, res) => {
         }
       });
     }
-    
+
     const credentials = `${consumerKey}:${consumerSecret}`;
     const bearerToken = Buffer.from(credentials).toString('base64');
-    
+
     console.log('Testing with credentials:', {
       consumerKeyLength: consumerKey.length,
       consumerSecretLength: consumerSecret.length,
@@ -1600,10 +1605,10 @@ exports.testMpesaConnection = async (req, res) => {
     if (tokenResponse.ok) {
       try {
         const tokenData = JSON.parse(responseText);
-        
+
         if (tokenData.access_token) {
           console.log('✅ M-Pesa API connection successful');
-          
+
           return res.json({
             status: 'success',
             message: 'M-Pesa API connection successful',
@@ -1638,7 +1643,7 @@ exports.testMpesaConnection = async (req, res) => {
       }
     } else {
       console.log('❌ M-Pesa API connection failed');
-      
+
       return res.json({
         status: 'error',
         message: `M-Pesa API request failed: ${tokenResponse.status} ${tokenResponse.statusText}`,
@@ -1654,7 +1659,7 @@ exports.testMpesaConnection = async (req, res) => {
 
   } catch (error) {
     console.error('M-Pesa connection test error:', error);
-    
+
     return res.json({
       status: 'error',
       message: 'M-Pesa connection test failed',
@@ -1744,7 +1749,7 @@ exports.reverseMpesaTransaction = async (req, res) => {
         // Get access token first
         const credentials = `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`;
         const bearerToken = Buffer.from(credentials).toString('base64');
-        
+
         const tokenResponse = await fetch(`${MPESA_BASE_URL}/v1/token/generate?grant_type=client_credentials`, {
           method: 'GET',
           headers: {
@@ -1752,14 +1757,14 @@ exports.reverseMpesaTransaction = async (req, res) => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
-          
+
           if (tokenData.access_token) {
             // Generate unique conversation ID
             const originatorConversationId = `REV_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
+
             // Initiate transaction reversal
             const reversalRequest = {
               OriginatorConversationID: originatorConversationId,
@@ -1776,9 +1781,9 @@ exports.reverseMpesaTransaction = async (req, res) => {
               Remarks: remarks,
               Occasion: occasion
             };
-            
+
             console.log('Reversal request:', reversalRequest);
-            
+
             const reversalResponse = await fetch(`${MPESA_BASE_URL}/mpesa/reversal/v2/request`, {
               method: 'POST',
               headers: {
@@ -1787,11 +1792,11 @@ exports.reverseMpesaTransaction = async (req, res) => {
               },
               body: JSON.stringify(reversalRequest)
             });
-            
+
             if (reversalResponse.ok) {
               const reversalData = await reversalResponse.json();
               console.log('M-Pesa Reversal Response:', reversalData);
-              
+
               return res.json({
                 status: 'success',
                 message: 'Transaction reversal initiated successfully',
@@ -1820,10 +1825,10 @@ exports.reverseMpesaTransaction = async (req, res) => {
 
     // Demo mode - simulate transaction reversal
     console.log('🔄 Using M-Pesa transaction reversal demo mode...');
-    
+
     const conversationId = `AG_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}_${Math.random().toString(36).substr(2, 20)}`;
     const originatorConversationId = `REV_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const demoResponse = {
       OriginatorConversationID: originatorConversationId,
       ConversationID: conversationId,
@@ -1835,7 +1840,7 @@ exports.reverseMpesaTransaction = async (req, res) => {
     setTimeout(async () => {
       try {
         const reversalTransactionId = `REV${Math.random().toString().slice(2, 8).toUpperCase()}`;
-        
+
         const demoReversalResult = {
           Result: {
             ResultType: 0,
@@ -1958,9 +1963,9 @@ exports.reverseMpesaTransaction = async (req, res) => {
 
   } catch (error) {
     console.error('Reverse M-Pesa Transaction Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to reverse M-Pesa transaction',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -1979,13 +1984,13 @@ exports.handleMpesaReversalResult = async (req, res) => {
       return res.status(400).json({ message: 'Invalid reversal result data' });
     }
 
-    const { 
-      ResultCode, 
-      ResultDesc, 
-      OriginatorConversationID, 
-      ConversationID, 
+    const {
+      ResultCode,
+      ResultDesc,
+      OriginatorConversationID,
+      ConversationID,
       TransactionID,
-      ResultParameters 
+      ResultParameters
     } = Result;
 
     // Extract reversal details from result parameters
@@ -1999,7 +2004,7 @@ exports.handleMpesaReversalResult = async (req, res) => {
 
     if (ResultParameters && ResultParameters.ResultParameter) {
       const params = ResultParameters.ResultParameter;
-      
+
       for (const param of params) {
         switch (param.Key) {
           case 'DebitAccountBalance':
@@ -2036,16 +2041,16 @@ exports.handleMpesaReversalResult = async (req, res) => {
       debitParty: debitPartyName
     });
 
-    res.json({ 
+    res.json({
       ResultCode: 0,
-      ResultDesc: 'Reversal result processed successfully' 
+      ResultDesc: 'Reversal result processed successfully'
     });
 
   } catch (error) {
     console.error('M-Pesa Reversal Result Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       ResultCode: 1,
-      ResultDesc: 'Reversal result processing failed' 
+      ResultDesc: 'Reversal result processing failed'
     });
   }
 };
@@ -2057,16 +2062,16 @@ exports.handleMpesaReversalTimeout = async (req, res) => {
 
     console.log('⏰ M-Pesa transaction reversal timed out');
 
-    res.json({ 
+    res.json({
       ResultCode: 0,
-      ResultDesc: 'Reversal timeout processed successfully' 
+      ResultDesc: 'Reversal timeout processed successfully'
     });
 
   } catch (error) {
     console.error('M-Pesa Reversal Timeout Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       ResultCode: 1,
-      ResultDesc: 'Reversal timeout processing failed' 
+      ResultDesc: 'Reversal timeout processing failed'
     });
   }
 };
@@ -2077,7 +2082,7 @@ exports.handleMpesaReversalTimeout = async (req, res) => {
 
 exports.simulateCustomerPayment = async (req, res) => {
   try {
-    const { 
+    const {
       commandId = 'CustomerPayBillOnline',
       amount,
       msisdn,
@@ -2121,7 +2126,7 @@ exports.simulateCustomerPayment = async (req, res) => {
         // Get access token first
         const credentials = `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`;
         const bearerToken = Buffer.from(credentials).toString('base64');
-        
+
         const tokenResponse = await fetch(`${MPESA_BASE_URL}/v1/token/generate?grant_type=client_credentials`, {
           method: 'GET',
           headers: {
@@ -2129,10 +2134,10 @@ exports.simulateCustomerPayment = async (req, res) => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
-          
+
           if (tokenData.access_token) {
             // Simulate customer payment
             const simulationRequest = {
@@ -2142,9 +2147,9 @@ exports.simulateCustomerPayment = async (req, res) => {
               BillRefNumber: billRefNumber,
               ShortCode: shortCode
             };
-            
+
             console.log('Simulation request:', simulationRequest);
-            
+
             const simulationResponse = await fetch(`${MPESA_BASE_URL}/mpesa/b2c/simulatetransaction/v1/request`, {
               method: 'POST',
               headers: {
@@ -2153,11 +2158,11 @@ exports.simulateCustomerPayment = async (req, res) => {
               },
               body: JSON.stringify(simulationRequest)
             });
-            
+
             if (simulationResponse.ok) {
               const simulationData = await simulationResponse.json();
               console.log('✅ M-Pesa payment simulation successful:', simulationData);
-              
+
               return res.json({
                 status: 'success',
                 message: 'Customer payment simulation initiated successfully',
@@ -2187,10 +2192,10 @@ exports.simulateCustomerPayment = async (req, res) => {
 
     // Demo mode - simulate the entire C2B flow
     console.log('🎭 Using M-Pesa customer payment simulation demo mode...');
-    
+
     const conversationId = `AG_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}_${Math.random().toString(36).substr(2, 20)}`;
     const originatorConversationId = `${Math.random().toString(36).substr(2, 4)}-${Math.random().toString(36).substr(2, 4)}-${Math.random().toString(36).substr(2, 4)}-${Math.random().toString(36).substr(2, 12)}`;
-    
+
     const demoResponse = {
       ConversationID: conversationId,
       OriginatorConversationID: originatorConversationId,
@@ -2202,7 +2207,7 @@ exports.simulateCustomerPayment = async (req, res) => {
     setTimeout(async () => {
       try {
         console.log('🔄 Simulating C2B validation request...');
-        
+
         // Simulate validation request to our own endpoint
         const validationData = {
           RequestType: "Validation",
@@ -2231,7 +2236,7 @@ exports.simulateCustomerPayment = async (req, res) => {
           // Simulate confirmation after validation success
           setTimeout(async () => {
             console.log('🔄 Simulating C2B confirmation request...');
-            
+
             const confirmationData = {
               RequestType: "Confirmation",
               TransactionType: "Pay Bill",
@@ -2278,9 +2283,9 @@ exports.simulateCustomerPayment = async (req, res) => {
 
   } catch (error) {
     console.error('Simulate Customer Payment Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to simulate customer payment',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -2295,10 +2300,10 @@ exports.queryMpesaAccountBalance = async (req, res) => {
 
     // Use environment shortcode if not provided
     const businessShortCode = partyA || MPESA_SHORTCODE;
-    
+
     if (!businessShortCode) {
-      return res.status(400).json({ 
-        message: 'Party A (Short Code) is required' 
+      return res.status(400).json({
+        message: 'Party A (Short Code) is required'
       });
     }
 
@@ -2310,7 +2315,7 @@ exports.queryMpesaAccountBalance = async (req, res) => {
         // Get access token first
         const credentials = `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`;
         const bearerToken = Buffer.from(credentials).toString('base64');
-        
+
         const tokenResponse = await fetch(`${MPESA_BASE_URL}/v1/token/generate?grant_type=client_credentials`, {
           method: 'GET',
           headers: {
@@ -2318,14 +2323,14 @@ exports.queryMpesaAccountBalance = async (req, res) => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
-          
+
           if (tokenData.access_token) {
             // Generate unique conversation ID
             const originatorConversationId = `BAL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
+
             // Query account balance
             const balanceRequest = {
               OriginatorConversationID: originatorConversationId,
@@ -2338,9 +2343,9 @@ exports.queryMpesaAccountBalance = async (req, res) => {
               QueueTimeOutURL: `${process.env.BACKEND_URL || 'http://localhost:5001'}/api/payments/mpesa-balance-timeout`,
               ResultURL: `${process.env.BACKEND_URL || 'http://localhost:5001'}/api/payments/mpesa-balance-result`
             };
-            
+
             console.log('Balance query request:', balanceRequest);
-            
+
             const balanceResponse = await fetch(`${MPESA_BASE_URL}/mpesa/accountbalance/v2/query`, {
               method: 'POST',
               headers: {
@@ -2349,11 +2354,11 @@ exports.queryMpesaAccountBalance = async (req, res) => {
               },
               body: JSON.stringify(balanceRequest)
             });
-            
+
             if (balanceResponse.ok) {
               const balanceData = await balanceResponse.json();
               console.log('M-Pesa Balance Response:', balanceData);
-              
+
               return res.json({
                 status: 'success',
                 message: 'Account balance query initiated',
@@ -2378,7 +2383,7 @@ exports.queryMpesaAccountBalance = async (req, res) => {
 
     // Demo mode - simulate account balance
     console.log('💰 Using M-Pesa account balance demo mode...');
-    
+
     const demoBalance = {
       OriginatorConversationID: `BAL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       ConversationID: `AG_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}_${Math.random().toString(36).substr(2, 20)}`,
@@ -2434,9 +2439,9 @@ exports.queryMpesaAccountBalance = async (req, res) => {
 
   } catch (error) {
     console.error('Query M-Pesa Account Balance Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to query M-Pesa account balance',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -2455,13 +2460,13 @@ exports.handleMpesaBalanceResult = async (req, res) => {
       return res.status(400).json({ message: 'Invalid balance result data' });
     }
 
-    const { 
-      ResultCode, 
-      ResultDesc, 
-      OriginatorConversationID, 
-      ConversationID, 
+    const {
+      ResultCode,
+      ResultDesc,
+      OriginatorConversationID,
+      ConversationID,
       TransactionID,
-      ResultParameters 
+      ResultParameters
     } = Result;
 
     // Extract balance information from result parameters
@@ -2471,7 +2476,7 @@ exports.handleMpesaBalanceResult = async (req, res) => {
 
     if (ResultParameters && ResultParameters.ResultParameter) {
       const params = ResultParameters.ResultParameter;
-      
+
       for (const param of params) {
         switch (param.Key) {
           case 'ActionType':
@@ -2510,16 +2515,16 @@ exports.handleMpesaBalanceResult = async (req, res) => {
       balances: parsedBalances
     });
 
-    res.json({ 
+    res.json({
       ResultCode: 0,
-      ResultDesc: 'Balance result processed successfully' 
+      ResultDesc: 'Balance result processed successfully'
     });
 
   } catch (error) {
     console.error('M-Pesa Balance Result Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       ResultCode: 1,
-      ResultDesc: 'Balance result processing failed' 
+      ResultDesc: 'Balance result processing failed'
     });
   }
 };
@@ -2531,16 +2536,16 @@ exports.handleMpesaBalanceTimeout = async (req, res) => {
 
     console.log('⏰ M-Pesa account balance query timed out');
 
-    res.json({ 
+    res.json({
       ResultCode: 0,
-      ResultDesc: 'Balance timeout processed successfully' 
+      ResultDesc: 'Balance timeout processed successfully'
     });
 
   } catch (error) {
     console.error('M-Pesa Balance Timeout Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       ResultCode: 1,
-      ResultDesc: 'Balance timeout processing failed' 
+      ResultDesc: 'Balance timeout processing failed'
     });
   }
 };
@@ -2554,14 +2559,14 @@ exports.registerMpesaUrls = async (req, res) => {
     const { shortCode, responseType = 'Completed' } = req.body;
 
     if (!shortCode) {
-      return res.status(400).json({ 
-        message: 'Short Code is required' 
+      return res.status(400).json({
+        message: 'Short Code is required'
       });
     }
 
     // Use environment shortcode if not provided
     const businessShortCode = shortCode || MPESA_SHORTCODE;
-    
+
     // Construct URLs based on current backend URL
     const baseUrl = process.env.BACKEND_URL || 'http://localhost:5001';
     const validationUrl = `${baseUrl}/api/payments/mpesa-validation`;
@@ -2580,7 +2585,7 @@ exports.registerMpesaUrls = async (req, res) => {
         // Get access token first
         const credentials = `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`;
         const bearerToken = Buffer.from(credentials).toString('base64');
-        
+
         const tokenResponse = await fetch(`${MPESA_BASE_URL}/v1/token/generate?grant_type=client_credentials`, {
           method: 'GET',
           headers: {
@@ -2588,10 +2593,10 @@ exports.registerMpesaUrls = async (req, res) => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
-          
+
           if (tokenData.access_token) {
             // Register URLs using API key method (as shown in documentation)
             const registrationData = {
@@ -2618,7 +2623,7 @@ exports.registerMpesaUrls = async (req, res) => {
             if (registerResponse.ok) {
               const registerData = await registerResponse.json();
               console.log('✅ M-Pesa URLs registered successfully:', registerData);
-              
+
               return res.json({
                 status: 'success',
                 message: 'M-Pesa URLs registered successfully',
@@ -2647,7 +2652,7 @@ exports.registerMpesaUrls = async (req, res) => {
 
     // Demo mode - simulate successful registration
     console.log('📱 Using M-Pesa URL registration demo mode...');
-    
+
     const demoResponse = {
       header: {
         responseCode: 200,
@@ -2674,9 +2679,9 @@ exports.registerMpesaUrls = async (req, res) => {
 
   } catch (error) {
     console.error('Register M-Pesa URLs Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to register M-Pesa URLs',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -2688,7 +2693,7 @@ exports.registerMpesaUrls = async (req, res) => {
 exports.getMpesaConfiguration = async (req, res) => {
   try {
     const baseUrl = process.env.BACKEND_URL || 'http://localhost:5001';
-    
+
     res.json({
       status: 'success',
       configuration: {
@@ -2699,28 +2704,28 @@ exports.getMpesaConfiguration = async (req, res) => {
           // STK Push (Business to Customer)
           stkPush: `${baseUrl}/api/payments/initialize`,
           stkCallback: `${baseUrl}/api/payments/mpesa-callback`,
-          
+
           // C2B (Customer to Business)
           c2bValidation: `${baseUrl}/api/payments/mpesa-validation`,
           c2bConfirmation: `${baseUrl}/api/payments/mpesa-confirmation`,
           c2bRegisterUrls: `${baseUrl}/api/payments/register-urls`,
           c2bSimulation: `${baseUrl}/api/payments/simulate-customer-payment`,
-          
+
           // Transaction Status Query
           statusQuery: `${baseUrl}/api/payments/query-status`,
           statusResult: `${baseUrl}/api/payments/mpesa-status-result`,
           statusTimeout: `${baseUrl}/api/payments/mpesa-timeout`,
-          
+
           // Account Balance Query
           balanceQuery: `${baseUrl}/api/payments/query-balance`,
           balanceResult: `${baseUrl}/api/payments/mpesa-balance-result`,
           balanceTimeout: `${baseUrl}/api/payments/mpesa-balance-timeout`,
-          
+
           // Transaction Reversal
           transactionReversal: `${baseUrl}/api/payments/reverse-transaction`,
           reversalResult: `${baseUrl}/api/payments/mpesa-reversal-result`,
           reversalTimeout: `${baseUrl}/api/payments/mpesa-reversal-timeout`,
-          
+
           // Statistics & Configuration
           mpesaStats: `${baseUrl}/api/payments/mpesa-stats`,
           c2bStats: `${baseUrl}/api/payments/c2b-stats`,
@@ -2739,7 +2744,7 @@ exports.getMpesaConfiguration = async (req, res) => {
         },
         supportedOperations: [
           'STK Push Payment Initiation',
-          'C2B Payment Validation & Confirmation', 
+          'C2B Payment Validation & Confirmation',
           'Transaction Status Query',
           'Account Balance Query',
           'Transaction Reversal & Refunds',
@@ -2773,7 +2778,7 @@ exports.getC2BStats = async (req, res) => {
     });
 
     const totalC2BAmount = await prisma.payment.aggregate({
-      where: { 
+      where: {
         paymentMethod: 'mpesa_c2b',
         status: 'success'
       },
@@ -2831,13 +2836,13 @@ exports.handleMpesaStatusResult = async (req, res) => {
       return res.status(400).json({ message: 'Invalid result data' });
     }
 
-    const { 
-      ResultCode, 
-      ResultDesc, 
-      OriginatorConversationID, 
-      ConversationID, 
+    const {
+      ResultCode,
+      ResultDesc,
+      OriginatorConversationID,
+      ConversationID,
       TransactionID,
-      ResultParameters 
+      ResultParameters
     } = Result;
 
     // Extract transaction details from result parameters
@@ -2848,7 +2853,7 @@ exports.handleMpesaStatusResult = async (req, res) => {
 
     if (ResultParameters && ResultParameters.ResultParameter) {
       const params = ResultParameters.ResultParameter;
-      
+
       for (const param of params) {
         switch (param.Key) {
           case 'TransactionStatus':
@@ -2871,11 +2876,11 @@ exports.handleMpesaStatusResult = async (req, res) => {
     const payment = await prisma.payment.findFirst({
       where: {
         OR: [
-          { 
-            metadata: { 
-              path: ['merchant_request_id'], 
-              equals: OriginatorConversationID 
-            } 
+          {
+            metadata: {
+              path: ['merchant_request_id'],
+              equals: OriginatorConversationID
+            }
           },
           { mpesaReceiptNumber: receiptNo }
         ]
@@ -2905,16 +2910,16 @@ exports.handleMpesaStatusResult = async (req, res) => {
       console.log(`✅ Transaction status updated: ${TransactionID} - ${transactionStatus}`);
     }
 
-    res.json({ 
+    res.json({
       ResultCode: 0,
-      ResultDesc: 'Status result processed successfully' 
+      ResultDesc: 'Status result processed successfully'
     });
 
   } catch (error) {
     console.error('M-Pesa Status Result Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       ResultCode: 1,
-      ResultDesc: 'Status result processing failed' 
+      ResultDesc: 'Status result processing failed'
     });
   }
 };
@@ -2927,16 +2932,16 @@ exports.handleMpesaTimeout = async (req, res) => {
     // Log timeout for monitoring
     console.log('⏰ M-Pesa transaction status query timed out');
 
-    res.json({ 
+    res.json({
       ResultCode: 0,
-      ResultDesc: 'Timeout processed successfully' 
+      ResultDesc: 'Timeout processed successfully'
     });
 
   } catch (error) {
     console.error('M-Pesa Timeout Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       ResultCode: 1,
-      ResultDesc: 'Timeout processing failed' 
+      ResultDesc: 'Timeout processing failed'
     });
   }
 };
